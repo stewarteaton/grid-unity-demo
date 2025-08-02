@@ -1,40 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { ParsedPowerSystemData } from "../../../types/power-system";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-interface ParsedPowerSystemData {
-  format: string;
-  base_power?: number;
-  buses?: Array<{
-    id: string;
-    name?: string;
-    voltage?: number;
-    vm?: number;
-    va?: number;
-  }>;
-  loads?: Array<{
-    bus_id: string;
-    mw: number;
-    mvar: number;
-  }>;
-  branches?: Array<{
-    from: string;
-    to: string;
-    r: number;
-    x: number;
-  }>;
-  generators?: Array<{
-    id: string;
-    bus_id: string;
-    type?: string;
-    base_mva?: number;
-    inertia?: number;
-  }>;
-}
 
 // Add fallback parser for .raw files
 function fallbackParseRaw(fileContent: string): ParsedPowerSystemData {
@@ -254,7 +225,9 @@ Return your analysis as JSON with keys: summary, loadAnalysis, topology, recomme
       throw new Error("No analysis response from OpenAI");
     }
 
-    return JSON.parse(responseText);
+    // Remove markdown code block if present
+    const cleaned = responseText.replace(/^```json|^```|```$/gm, "").trim();
+    return JSON.parse(cleaned);
   } catch (error) {
     console.error("Error generating analysis:", error);
     // Return a basic analysis if AI analysis fails
