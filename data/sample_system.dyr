@@ -1,0 +1,6 @@
+'GEN-1' 1 'GENCLS' 1 100.0 5.0 / Simple generator model at Bus 1
+'GEN-2' 2 'GENROU' 1 200.0 6.0 0.1 0.01 0.1 0.01 6.5 0.4 0.4 / Generator with more dynamics
+'GEN-3' 3 'GENROU' 1 150.0 6.0 0.1 0.01 0.1 0.01 6.0 0.35 0.35
+
+'EXC-1' 1 'IEEET1' 1 200.0 0.02 0.001 5.0 0.1 0.05 0.04 0.2 0.1
+'EXC-2' 2 'IEEET1' 1 150.0 0.025 0.001 4.5 0.12 0.045 0.03 0.18 0.09
