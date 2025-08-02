@@ -1,7 +1,11 @@
 "use client";
 import Image from "next/image";
 import { useState } from "react";
-import { ParsedPowerSystemData, AnalysisResult, ProcessingResult } from "../types/power-system";
+import {
+  ParsedPowerSystemData,
+  AnalysisResult,
+  ProcessingResult,
+} from "../types/power-system";
 
 export default function Home() {
   const [fileData, setFileData] = useState<string>("");
@@ -10,10 +14,40 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"upload" | "paste">("upload");
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFileData(e.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      const file = files[0];
       setSelectedFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -117,7 +151,16 @@ export default function Home() {
           {/* File Upload Tab */}
           {activeTab === "upload" && (
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  isDragOver
+                    ? "border-blue-400 bg-blue-50"
+                    : "border-gray-300 hover:border-blue-400"
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <input
                   type="file"
                   accept=".raw,.dyr,.txt,.json,.csv"
@@ -128,7 +171,9 @@ export default function Home() {
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <div className="space-y-2">
                     <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
+                      className={`mx-auto h-12 w-12 ${
+                        isDragOver ? "text-blue-400" : "text-gray-400"
+                      }`}
                       stroke="currentColor"
                       fill="none"
                       viewBox="0 0 48 48"
@@ -140,9 +185,15 @@ export default function Home() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <div className="text-gray-600">
-                      <span className="font-medium">Click to upload</span> or
-                      drag and drop
+                    <div
+                      className={`${
+                        isDragOver ? "text-blue-600" : "text-gray-600"
+                      }`}
+                    >
+                      <span className="font-medium">
+                        {isDragOver ? "Drop files here" : "Click to upload"}
+                      </span>
+                      {!isDragOver && " or drag and drop"}
                     </div>
                     <p className="text-xs text-gray-500">
                       Supports .raw, .dyr, .json, .csv, and .txt files
