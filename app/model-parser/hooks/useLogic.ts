@@ -11,6 +11,7 @@ export const useLogic = () => {
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -82,6 +83,21 @@ export const useLogic = () => {
     return data.trim().length > 0;
   };
 
+  const startProcessing = () => {
+    setIsProcessing(true);
+    setCurrentStep(0);
+    setResult(null);
+  };
+
+  const updateProcessingStep = (step: number) => {
+    setCurrentStep(step);
+  };
+
+  const finishProcessing = () => {
+    setIsProcessing(false);
+    setCurrentStep(0);
+  };
+
   return {
     // State
     fileData,
@@ -91,6 +107,7 @@ export const useLogic = () => {
     result,
     selectedFile,
     isDragOver,
+    currentStep,
 
     // Actions
     setResult,
@@ -104,5 +121,8 @@ export const useLogic = () => {
     handleTabChange,
     getDataToProcess,
     hasDataToProcess,
+    startProcessing,
+    updateProcessingStep,
+    finishProcessing,
   };
 };

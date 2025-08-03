@@ -4,9 +4,31 @@ export const useConnect = () => {
   const processData = async (
     dataToProcess: string,
     activeTab: "upload" | "paste",
-    selectedFile: File | null
+    selectedFile: File | null,
+    onStepUpdate?: (step: number) => void
   ): Promise<ProcessingResult> => {
     try {
+      // Simulate processing steps
+      const steps = [
+        "Analyzing file format and structure...",
+        "Parsing power system components...",
+        "Extracting bus, load, and generator data...",
+        "Running AI analysis on system topology...",
+        "Generating recommendations and insights...",
+        "Finalizing results...",
+      ];
+
+      // Update steps with delays to simulate processing
+      for (let i = 0; i < steps.length; i++) {
+        onStepUpdate?.(i);
+        // Add small delays between steps to show progress
+        if (i < steps.length - 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 800 + Math.random() * 400)
+          );
+        }
+      }
+
       const response = await fetch("/api/process-file-upload", {
         method: "POST",
         headers: {

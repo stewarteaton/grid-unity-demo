@@ -9,6 +9,7 @@ import {
   ProcessButton,
   ResultsDisplay,
   EmptyResultsPlaceholder,
+  LoadingSteps,
 } from "./components";
 
 export default function ModelParser() {
@@ -20,6 +21,7 @@ export default function ModelParser() {
     result,
     selectedFile,
     isDragOver,
+    currentStep,
     setResult,
     setIsProcessing,
     handleFileUpload,
@@ -31,6 +33,9 @@ export default function ModelParser() {
     handleTabChange,
     getDataToProcess,
     hasDataToProcess,
+    startProcessing,
+    updateProcessingStep,
+    finishProcessing,
   } = useLogic();
 
   const { processData } = useConnect();
@@ -43,11 +48,15 @@ export default function ModelParser() {
       return;
     }
 
-    setIsProcessing(true);
-    setResult(null);
+    startProcessing();
 
     try {
-      const result = await processData(dataToProcess, activeTab, selectedFile);
+      const result = await processData(
+        dataToProcess,
+        activeTab,
+        selectedFile,
+        updateProcessingStep
+      );
       setResult(result);
       console.log("Processing result:", result);
     } catch (error) {
@@ -58,7 +67,7 @@ export default function ModelParser() {
           error instanceof Error ? error.message : "Unknown error occurred",
       });
     } finally {
-      setIsProcessing(false);
+      finishProcessing();
     }
   };
 
@@ -142,7 +151,9 @@ export default function ModelParser() {
         <div className="w-full bg-white rounded-lg shadow-lg p-6 border border-gray-200">
           <h2 className="text-2xl font-semibold mb-4">Analysis Results</h2>
 
-          {result ? (
+          {isProcessing ? (
+            <LoadingSteps currentStep={currentStep} />
+          ) : result ? (
             <ResultsDisplay result={result} />
           ) : (
             <EmptyResultsPlaceholder />
