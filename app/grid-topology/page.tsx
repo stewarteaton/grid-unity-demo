@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { mockGeoJSONData } from "./mock-data/GeoJSON";
 
@@ -60,7 +60,36 @@ export default function GridTopologyExplorer() {
   );
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const [hoveredLink, setHoveredLink] = useState<any>(null);
+  const [mousePosition, setMousePosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const graphRef = useRef<any>(null);
+
+  // Add mouse move handler to track position globally
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    setMousePosition({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  // Add and remove mouse move listener
+  useEffect(() => {
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [handleMouseMove]);
+
+  // Center the graph when data is loaded
+  useEffect(() => {
+    if (parsedTopology && graphRef.current) {
+      setTimeout(() => {
+        if (graphRef.current) {
+          graphRef.current.centerAt(0, 0, 1000);
+          graphRef.current.zoom(1.5, 1000);
+        }
+      }, 100);
+    }
+  }, [parsedTopology]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -243,10 +272,12 @@ export default function GridTopologyExplorer() {
 
   const handleNodeClick = useCallback((node: any) => {
     console.log("Clicked node:", node);
+    // Don't try to render the node object directly
   }, []);
 
   const handleLinkClick = useCallback((link: any) => {
     console.log("Clicked link:", link);
+    // Don't try to render the link object directly
   }, []);
 
   const exportGraphData = () => {
@@ -265,7 +296,7 @@ export default function GridTopologyExplorer() {
   };
 
   const getVoltageColor = (voltage?: number) => {
-    if (!voltage) return "#666";
+    if (!voltage || isNaN(voltage)) return "#666";
     if (voltage >= 500) return "#ff4444"; // Red for 500kV+
     if (voltage >= 345) return "#ff8800"; // Orange for 345kV
     if (voltage >= 230) return "#ffcc00"; // Yellow for 230kV
@@ -273,11 +304,35 @@ export default function GridTopologyExplorer() {
     return "#666"; // Gray for others
   };
 
+  const getNodeColor = (node: any) => {
+    if (!node) return "#666";
+    return getVoltageColor(node.voltage);
+  };
+
+  const getLinkColor = (link: any) => {
+    if (!link) return "#666";
+    return getVoltageColor(link.voltage);
+  };
+
+  const getNodeLabel = (node: any) => {
+    if (!node) return "";
+    const name = node.name || "Unknown";
+    const id = node.id || "Unknown";
+    return `${name} (${id})`;
+  };
+
+  const getLinkLabel = (link: any) => {
+    if (!link) return "";
+    const source = link.source || "Unknown";
+    const target = link.target || "Unknown";
+    return `${source} → ${target}`;
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-4">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start max-w-6xl w-full">
+    <div className="font-sans grid grid-rows-[5x_1fr_5px] md:grid-rows-[0_1fr_0] items-center justify-items-center min-h-screen p-2 pb-20 gap-2">
+      <main className="flex flex-col gap-[16px] row-start-2 items-center sm:items-start max-w-4xl w-full">
         <div className="text-center sm:text-left">
-          <h1 className="text-4xl font-bold mb-4">Grid Topology Explorer</h1>
+          <h1 className="text-3xl font-bold mb-4">Grid Topology Explorer</h1>
           <p className="text-lg text-gray-600">
             Parse and visualize electric transmission line or substation data
           </p>
@@ -549,61 +604,153 @@ export default function GridTopologyExplorer() {
             </div>
 
             {/* Hover Tooltip */}
-            {(hoveredNode || hoveredLink) && (
-              <div
-                className="fixed z-50 bg-black text-white p-3 rounded-lg shadow-lg pointer-events-none"
-                style={{
-                  left: (hoveredNode || hoveredLink)?.x + 10,
-                  top: (hoveredNode || hoveredLink)?.y - 10,
-                }}
-              >
-                {hoveredNode && (
-                  <div>
-                    <div className="font-bold">{hoveredNode.name}</div>
-                    <div>ID: {hoveredNode.id}</div>
-                    {hoveredNode.voltage && (
-                      <div>Voltage: {hoveredNode.voltage} kV</div>
-                    )}
-                  </div>
-                )}
-                {hoveredLink && (
-                  <div>
-                    <div className="font-bold">Transmission Line</div>
-                    <div>From: {hoveredLink.source}</div>
-                    <div>To: {hoveredLink.target}</div>
-                    {hoveredLink.voltage && (
-                      <div>Voltage: {hoveredLink.voltage} kV</div>
-                    )}
-                    {hoveredLink.lineType && (
-                      <div>Type: {hoveredLink.lineType}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {(hoveredNode || hoveredLink) &&
+              mousePosition &&
+              !isNaN(mousePosition.x) &&
+              !isNaN(mousePosition.y) && (
+                <div
+                  className="fixed z-50 bg-black text-white p-4 rounded-lg shadow-lg pointer-events-none border border-gray-600"
+                  style={{
+                    left: mousePosition.x + 15,
+                    top: mousePosition.y - 15,
+                    maxWidth: "300px",
+                    minWidth: "200px",
+                  }}
+                >
+                  {hoveredNode && (
+                    <div className="space-y-2">
+                      <div className="font-bold text-lg border-b border-gray-600 pb-2">
+                        {String(hoveredNode.name || "Unknown Substation")}
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">ID:</span>
+                          <span className="font-mono">
+                            {String(hoveredNode.id || "Unknown")}
+                          </span>
+                        </div>
+                        {hoveredNode.voltage && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Voltage:</span>
+                            <span className="font-semibold">
+                              {String(hoveredNode.voltage)} kV
+                            </span>
+                          </div>
+                        )}
+                        {hoveredNode.x !== undefined &&
+                          hoveredNode.y !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-300">
+                                Coordinates:
+                              </span>
+                              <span className="font-mono text-xs">
+                                ({Number(hoveredNode.x).toFixed(2)},{" "}
+                                {Number(hoveredNode.y).toFixed(2)})
+                              </span>
+                            </div>
+                          )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">Type:</span>
+                          <span className="capitalize">
+                            {String(hoveredNode.type || "substation")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {hoveredLink && (
+                    <div className="space-y-2">
+                      <div className="font-bold text-lg border-b border-gray-600 pb-2">
+                        Transmission Line
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">ID:</span>
+                          <span className="font-mono">
+                            {String(hoveredLink.id || "Unknown")}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">From:</span>
+                          <span className="font-semibold">
+                            {String(hoveredLink.source || "Unknown")}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">To:</span>
+                          <span className="font-semibold">
+                            {String(hoveredLink.target || "Unknown")}
+                          </span>
+                        </div>
+                        {hoveredLink.voltage && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Voltage:</span>
+                            <span className="font-semibold">
+                              {String(hoveredLink.voltage)} kV
+                            </span>
+                          </div>
+                        )}
+                        {hoveredLink.lineType && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Type:</span>
+                            <span className="capitalize">
+                              {String(hoveredLink.lineType)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* Force Graph Visualization */}
             <div
-              className="border rounded-lg overflow-hidden"
+              className="border rounded-lg overflow-hidden relative"
               style={{ height: "600px" }}
             >
-              <ForceGraph2D
-                ref={graphRef}
-                graphData={parsedTopology.graphData}
-                nodeLabel={(node: any) => `${node.name} (${node.id})`}
-                linkLabel={(link: any) => `${link.source} → ${link.target}`}
-                nodeColor={(node: any) => getVoltageColor(node.voltage)}
-                linkColor={(link: any) => getVoltageColor(link.voltage)}
-                nodeRelSize={8}
-                linkWidth={2}
-                onNodeHover={handleNodeHover}
-                onLinkHover={handleLinkHover}
-                onNodeClick={handleNodeClick}
-                onLinkClick={handleLinkClick}
-                cooldownTicks={100}
-                linkDirectionalParticles={2}
-                linkDirectionalParticleSpeed={0.005}
+              {/* Map Background */}
+              <div
+                className="absolute inset-0 opacity-25"
+                style={{
+                  backgroundImage:
+                    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cpattern id='grid' width='10' height='10' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 10 0 L 0 0 0 10' fill='none' stroke='%23ddd' stroke-width='0.5'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grid)'/%3E%3C/svg%3E\")",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "repeat",
+                  zIndex: 0,
+                }}
               />
+
+              {parsedTopology.graphData &&
+                parsedTopology.graphData.nodes &&
+                parsedTopology.graphData.links && (
+                  <div className="relative z-10 h-full">
+                    <ForceGraph2D
+                      ref={graphRef}
+                      graphData={parsedTopology.graphData}
+                      nodeColor={getNodeColor}
+                      linkColor={getLinkColor}
+                      nodeRelSize={6}
+                      linkWidth={1}
+                      cooldownTicks={50}
+                      enableNodeDrag={true}
+                      enableZoomInteraction={true}
+                      enablePanInteraction={true}
+                      onNodeHover={handleNodeHover}
+                      onLinkHover={handleLinkHover}
+                      onNodeClick={handleNodeClick}
+                      onLinkClick={handleLinkClick}
+                      onEngineStop={() => {
+                        // Center the graph when the physics engine stops
+                        if (graphRef.current) {
+                          graphRef.current.centerAt(0, 0, 1000);
+                          graphRef.current.zoom(1.5, 1000);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
             </div>
 
             {/* Legend */}
