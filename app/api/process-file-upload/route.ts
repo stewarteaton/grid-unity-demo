@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { ParsedPowerSystemData } from "../../../types/power-system";
+import {
+  ParsedPowerSystemData,
+  AnalysisResult,
+} from "../../../types/power-system";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -28,34 +31,34 @@ function fallbackParseRaw(fileContent: string): ParsedPowerSystemData {
     if (section === "bus" && /^[0-9]/.test(line)) {
       const [id, name, voltage, , , , , vm, va] = line.split(",");
       buses.push({
-        id: id?.trim(),
-        name: name?.replace(/'/g, "").trim(),
-        voltage: parseFloat(voltage),
-        vm: parseFloat(vm),
-        va: parseFloat(va),
+        id: parseInt(id?.trim() || "0"),
+        name: name?.replace(/'/g, "").trim() || "",
+        voltage: parseFloat(voltage) || 0,
+        vm: parseFloat(vm) || 0,
+        va: parseFloat(va) || 0,
       });
     }
     if (section === "load" && /^[0-9]/.test(line)) {
       const [bus_id, , mw, mvar] = line.split(",");
       loads.push({
-        bus_id: bus_id?.trim(),
-        mw: parseFloat(mw),
-        mvar: parseFloat(mvar),
+        bus_id: parseInt(bus_id?.trim() || "0"),
+        mw: parseFloat(mw) || 0,
+        mvar: parseFloat(mvar) || 0,
       });
     }
     if (section === "branch" && /^[0-9]/.test(line)) {
       const [from, to, , r, x] = line.split(",");
       branches.push({
-        from: from?.trim(),
-        to: to?.trim(),
-        r: parseFloat(r),
-        x: parseFloat(x),
+        from: parseInt(from?.trim() || "0"),
+        to: parseInt(to?.trim() || "0"),
+        r: parseFloat(r) || 0,
+        x: parseFloat(x) || 0,
       });
     }
   }
 
   return {
-    format: "PSS/E RAW format",
+    format: "PSS/E RAW",
     base_power,
     buses,
     loads,
@@ -131,11 +134,13 @@ Your job is to:
 1. Identify the file format.
 2. Extract key parameters like:
    - Base power (MVA)
-   - Buses (id, name, voltage, vm, va)
-   - Loads (bus_id, mw, mvar)
-   - Branches (from, to, r, x)
-   - Generators (if any: id, bus_id, type, base MVA, inertia)
+   - Buses (id as number, name, voltage, vm, va)
+   - Loads (bus_id as number, mw, mvar)
+   - Branches (from as number, to as number, r, x)
+   - Generators (if any: id as number, bus_id as number, type, base MVA, inertia)
 3. Output JSON only.
+
+IMPORTANT: All IDs (bus id, bus_id, from, to) must be numbers, not strings.
 
 Here is the file content:
 
@@ -155,7 +160,7 @@ Ensure all numeric values are properly parsed as numbers, not strings.
         {
           role: "system",
           content:
-            "You are a power system expert. Always respond with valid JSON only, no additional text.",
+            "You are a power system expert. Always respond with valid JSON only, no additional text. Ensure all IDs are numbers.",
         },
         {
           role: "user",
@@ -184,21 +189,64 @@ Ensure all numeric values are properly parsed as numbers, not strings.
 
 async function generateSystemAnalysis(
   parsedData: ParsedPowerSystemData
-): Promise<any> {
+): Promise<AnalysisResult> {
   const analysisPrompt = `
 You are a power system analyst. Analyze the following power system data and provide insights:
 
 System Data:
 ${JSON.stringify(parsedData, null, 2)}
 
-Please provide analysis including:
-1. System summary (total buses, loads, branches, generators)
-2. Load analysis (total load, peak load, load distribution)
-3. Network topology insights
-4. Recommendations for system optimization
-5. Potential issues or areas of concern
+Please provide analysis in the following JSON structure:
 
-Return your analysis as JSON with keys: summary, loadAnalysis, topology, recommendations, issues.
+{
+  "summary": {
+    "totalBuses": number,
+    "totalLoads": number,
+    "totalBranches": number,
+    "totalGenerators": number,
+    "basePower": number,
+    "systemVoltageLevel": string
+  },
+  "loadAnalysis": {
+    "totalLoadMW": number,
+    "totalLoadMVAR": number,
+    "peakLoadBus": {
+      "busId": number,
+      "loadMW": number,
+      "loadMVAR": number
+    },
+    "loadDistribution": [
+      {
+        "busId": number,
+        "percentageMW": number,
+        "percentageMVAR": number
+      }
+    ]
+  },
+  "topology": {
+    "connections": [
+      {
+        "fromBus": number,
+        "toBus": number,
+        "impedance": string
+      }
+    ],
+    "networkType": string,
+    "criticalPath": string
+  },
+  "recommendations": {
+    "voltageRegulation": string,
+    "loadBalancing": string,
+    "lossReduction": string
+  },
+  "issues": {
+    "voltageDrop": string,
+    "reactivePowerSupport": string,
+    "noGenerators": string
+  }
+}
+
+Return only the JSON, no additional text.
 `;
 
   try {
@@ -208,7 +256,7 @@ Return your analysis as JSON with keys: summary, loadAnalysis, topology, recomme
         {
           role: "system",
           content:
-            "You are a power system analyst. Provide detailed analysis in JSON format.",
+            "You are a power system analyst. Provide detailed analysis in the exact JSON structure specified. Return only JSON, no additional text.",
         },
         {
           role: "user",
@@ -227,26 +275,65 @@ Return your analysis as JSON with keys: summary, loadAnalysis, topology, recomme
 
     // Remove markdown code block if present
     const cleaned = responseText.replace(/^```json|^```|```$/gm, "").trim();
-    return JSON.parse(cleaned);
+    const analysis: AnalysisResult = JSON.parse(cleaned);
+    return analysis;
   } catch (error) {
     console.error("Error generating analysis:", error);
     // Return a basic analysis if AI analysis fails
+    const totalLoadMW =
+      parsedData.loads?.reduce((sum, load) => sum + load.mw, 0) || 0;
+    const totalLoadMVAR =
+      parsedData.loads?.reduce((sum, load) => sum + load.mvar, 0) || 0;
+
     return {
       summary: {
         totalBuses: parsedData.buses?.length || 0,
         totalLoads: parsedData.loads?.length || 0,
         totalBranches: parsedData.branches?.length || 0,
         totalGenerators: parsedData.generators?.length || 0,
+        basePower: parsedData.base_power,
+        systemVoltageLevel: "Unknown",
       },
       loadAnalysis: {
-        totalLoad:
-          parsedData.loads?.reduce((sum, load) => sum + load.mw, 0) || 0,
-        message: "Basic load analysis available",
+        totalLoadMW,
+        totalLoadMVAR,
+        peakLoadBus: parsedData.loads?.[0]
+          ? {
+              busId: parsedData.loads[0].bus_id,
+              loadMW: parsedData.loads[0].mw,
+              loadMVAR: parsedData.loads[0].mvar,
+            }
+          : undefined,
+        loadDistribution:
+          parsedData.loads?.map((load) => ({
+            busId: load.bus_id,
+            percentageMW: (load.mw / totalLoadMW) * 100,
+            percentageMVAR: (load.mvar / totalLoadMVAR) * 100,
+          })) || [],
       },
-      recommendations: [
-        "Consider implementing advanced monitoring systems",
-        "Review load distribution for optimization opportunities",
-      ],
+      topology: {
+        connections:
+          parsedData.branches?.map((branch) => ({
+            fromBus: branch.from,
+            toBus: branch.to,
+            impedance: `${branch.r} + j${branch.x}`,
+          })) || [],
+        networkType: "Unknown",
+        criticalPath: "Unknown",
+      },
+      recommendations: {
+        voltageRegulation: "Consider implementing voltage regulation measures",
+        loadBalancing: "Monitor and optimize load distribution",
+        lossReduction: "Evaluate opportunities for reducing system losses",
+      },
+      issues: {
+        voltageDrop: "Monitor voltage levels across the system",
+        reactivePowerSupport: "Assess reactive power support requirements",
+        noGenerators:
+          parsedData.generators?.length === 0
+            ? "No generators detected in the system"
+            : undefined,
+      },
     };
   }
 }

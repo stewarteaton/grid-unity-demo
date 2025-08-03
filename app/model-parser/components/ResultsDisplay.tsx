@@ -171,35 +171,43 @@ export const ResultsDisplay = ({ result }: ResultsDisplayProps) => {
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-medium text-gray-900 mb-2">System Summary</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                {result.analysis.summary.totalBuses !== undefined && (
+                <div>
+                  <span className="text-gray-600">Total Buses:</span>
+                  <span className="ml-2 font-medium">
+                    {result.analysis.summary.totalBuses}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Loads:</span>
+                  <span className="ml-2 font-medium">
+                    {result.analysis.summary.totalLoads}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Branches:</span>
+                  <span className="ml-2 font-medium">
+                    {result.analysis.summary.totalBranches}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Generators:</span>
+                  <span className="ml-2 font-medium">
+                    {result.analysis.summary.totalGenerators}
+                  </span>
+                </div>
+                {result.analysis.summary.basePower && (
                   <div>
-                    <span className="text-gray-600">Total Buses:</span>
+                    <span className="text-gray-600">Base Power:</span>
                     <span className="ml-2 font-medium">
-                      {result.analysis.summary.totalBuses}
+                      {result.analysis.summary.basePower} MVA
                     </span>
                   </div>
                 )}
-                {result.analysis.summary.totalLoads !== undefined && (
+                {result.analysis.summary.systemVoltageLevel && (
                   <div>
-                    <span className="text-gray-600">Total Loads:</span>
+                    <span className="text-gray-600">Voltage Level:</span>
                     <span className="ml-2 font-medium">
-                      {result.analysis.summary.totalLoads}
-                    </span>
-                  </div>
-                )}
-                {result.analysis.summary.totalBranches !== undefined && (
-                  <div>
-                    <span className="text-gray-600">Total Branches:</span>
-                    <span className="ml-2 font-medium">
-                      {result.analysis.summary.totalBranches}
-                    </span>
-                  </div>
-                )}
-                {result.analysis.summary.totalGenerators !== undefined && (
-                  <div>
-                    <span className="text-gray-600">Total Generators:</span>
-                    <span className="ml-2 font-medium">
-                      {result.analysis.summary.totalGenerators}
+                      {result.analysis.summary.systemVoltageLevel}
                     </span>
                   </div>
                 )}
@@ -211,46 +219,137 @@ export const ResultsDisplay = ({ result }: ResultsDisplayProps) => {
           {result.analysis.loadAnalysis && (
             <div className="bg-blue-50 rounded-lg p-4">
               <h4 className="font-medium text-blue-900 mb-2">Load Analysis</h4>
-              {result.analysis.loadAnalysis.totalLoad && (
-                <p className="text-sm text-blue-800 mb-2">
+              <div className="space-y-2 text-sm text-blue-800">
+                <p>
                   Total Load:{" "}
-                  {formatNumber(result.analysis.loadAnalysis.totalLoad)} MW
+                  {formatNumber(result.analysis.loadAnalysis.totalLoadMW)} MW,{" "}
+                  {formatNumber(result.analysis.loadAnalysis.totalLoadMVAR)}{" "}
+                  MVAR
                 </p>
-              )}
-              {result.analysis.loadAnalysis.message && (
-                <p className="text-sm text-blue-800">
-                  {result.analysis.loadAnalysis.message}
+                {result.analysis.loadAnalysis.peakLoadBus && (
+                  <p>
+                    Peak Load: Bus{" "}
+                    {result.analysis.loadAnalysis.peakLoadBus.busId}(
+                    {formatNumber(
+                      result.analysis.loadAnalysis.peakLoadBus.loadMW
+                    )}{" "}
+                    MW,{" "}
+                    {formatNumber(
+                      result.analysis.loadAnalysis.peakLoadBus.loadMVAR
+                    )}{" "}
+                    MVAR)
+                  </p>
+                )}
+                {result.analysis.loadAnalysis.loadDistribution &&
+                  result.analysis.loadAnalysis.loadDistribution.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-1">Load Distribution:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {result.analysis.loadAnalysis.loadDistribution.map(
+                          (dist, index) => (
+                            <li key={index}>
+                              Bus {dist.busId}: {dist.percentageMW.toFixed(1)}%
+                              MW, {dist.percentageMVAR.toFixed(1)}% MVAR
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                  )}
+              </div>
+            </div>
+          )}
+
+          {/* Topology Analysis */}
+          {result.analysis.topology && (
+            <div className="bg-indigo-50 rounded-lg p-4">
+              <h4 className="font-medium text-indigo-900 mb-2">
+                Network Topology
+              </h4>
+              <div className="space-y-2 text-sm text-indigo-800">
+                <p>
+                  <strong>Network Type:</strong>{" "}
+                  {result.analysis.topology.networkType}
                 </p>
-              )}
+                <p>
+                  <strong>Critical Path:</strong>{" "}
+                  {result.analysis.topology.criticalPath}
+                </p>
+                {result.analysis.topology.connections &&
+                  result.analysis.topology.connections.length > 0 && (
+                    <div>
+                      <p className="font-medium mb-1">Connections:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {result.analysis.topology.connections.map(
+                          (conn, index) => (
+                            <li key={index}>
+                              Bus {conn.fromBus} → Bus {conn.toBus} (
+                              {conn.impedance})
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                  )}
+              </div>
             </div>
           )}
 
           {/* Recommendations */}
-          {result.analysis.recommendations &&
-            result.analysis.recommendations.length > 0 && (
-              <div className="bg-yellow-50 rounded-lg p-4">
-                <h4 className="font-medium text-yellow-900 mb-2">
-                  Recommendations
-                </h4>
-                <ul className="list-disc list-inside space-y-1 text-sm text-yellow-800">
-                  {result.analysis.recommendations.map((rec, index) => (
-                    <li key={index}>{rec}</li>
-                  ))}
-                </ul>
+          {result.analysis.recommendations && (
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h4 className="font-medium text-yellow-900 mb-2">
+                Recommendations
+              </h4>
+              <div className="space-y-2 text-sm text-yellow-800">
+                {result.analysis.recommendations.voltageRegulation && (
+                  <p>
+                    <strong>Voltage Regulation:</strong>{" "}
+                    {result.analysis.recommendations.voltageRegulation}
+                  </p>
+                )}
+                {result.analysis.recommendations.loadBalancing && (
+                  <p>
+                    <strong>Load Balancing:</strong>{" "}
+                    {result.analysis.recommendations.loadBalancing}
+                  </p>
+                )}
+                {result.analysis.recommendations.lossReduction && (
+                  <p>
+                    <strong>Loss Reduction:</strong>{" "}
+                    {result.analysis.recommendations.lossReduction}
+                  </p>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
           {/* Issues */}
-          {result.analysis.issues && result.analysis.issues.length > 0 && (
+          {result.analysis.issues && (
             <div className="bg-red-50 rounded-lg p-4">
               <h4 className="font-medium text-red-900 mb-2">
                 Potential Issues
               </h4>
-              <ul className="list-disc list-inside space-y-1 text-sm text-red-800">
-                {result.analysis.issues.map((issue, index) => (
-                  <li key={index}>{issue}</li>
-                ))}
-              </ul>
+              <div className="space-y-2 text-sm text-red-800">
+                {result.analysis.issues.voltageDrop && (
+                  <p>
+                    <strong>Voltage Drop:</strong>{" "}
+                    {result.analysis.issues.voltageDrop}
+                  </p>
+                )}
+                {result.analysis.issues.reactivePowerSupport && (
+                  <p>
+                    <strong>Reactive Power Support:</strong>{" "}
+                    {result.analysis.issues.reactivePowerSupport}
+                  </p>
+                )}
+                {result.analysis.issues.noGenerators && (
+                  <p>
+                    <strong>Generation:</strong>{" "}
+                    {result.analysis.issues.noGenerators}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
