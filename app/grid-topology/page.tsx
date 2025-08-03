@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { mockGeoJSONData } from "./mock-data/GeoJSON";
+import { mockPSLFData, mockOpenDSSData } from "./mock-data";
 
 // Dynamically import ForceGraph2D to avoid SSR issues
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
@@ -49,15 +50,15 @@ interface ParsedTopology {
 export default function GridTopologyExplorer() {
   const [fileData, setFileData] = useState<string>("");
   const [pastedData, setPastedData] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"upload" | "paste" | "demo">(
-    "demo"
+  const [activeTab, setActiveTab] = useState<"paste" | "demo">("demo");
+  const [demoFormat, setDemoFormat] = useState<"GeoJSON" | "PSLF" | "OpenDSS">(
+    "GeoJSON"
   );
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedTopology, setParsedTopology] = useState<ParsedTopology | null>(
     null
   );
+  const [detectedFormat, setDetectedFormat] = useState<string>("");
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const [hoveredLink, setHoveredLink] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState<{
@@ -91,156 +92,402 @@ export default function GridTopologyExplorer() {
     }
   }, [parsedTopology]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setFileData(e.target?.result as string);
-      };
-      reader.readAsText(file);
+  // Get demo data based on selected format
+  const getDemoData = () => {
+    switch (demoFormat) {
+      case "PSLF":
+        return mockPSLFData;
+      case "OpenDSS":
+        return mockOpenDSSData;
+      case "GeoJSON":
+      default:
+        return JSON.stringify(mockGeoJSONData, null, 2);
     }
   };
 
-  const clearSelectedFile = () => {
-    setSelectedFile(null);
-    setFileData("");
-    const fileInput = document.getElementById(
-      "file-upload"
-    ) as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = "";
+  // Detect data format
+  const detectFormat = (data: string): string => {
+    try {
+      const jsonData = JSON.parse(data);
+      if (jsonData.type === "FeatureCollection") {
+        return "GeoJSON";
+      }
+      if (jsonData.substations && jsonData.lines) {
+        return "Custom JSON";
+      }
+    } catch (jsonError) {
+      // Not JSON, check other formats
     }
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      const file = files[0];
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setFileData(e.target?.result as string);
-      };
-      reader.readAsText(file);
+    if (data.includes("C PSLF") || data.includes("Bus# Type Area Zone")) {
+      return "PSLF";
     }
+
+    if (
+      data.includes("New Circuit") ||
+      data.includes("Generator.") ||
+      data.includes("Load.")
+    ) {
+      return "OpenDSS";
+    }
+
+    return "Unknown";
   };
 
   const parseTopologyData = (data: string): ParsedTopology => {
     try {
-      const jsonData = JSON.parse(data);
+      // Try to parse as JSON first (GeoJSON or custom format)
+      try {
+        const jsonData = JSON.parse(data);
 
-      // Handle GeoJSON format
-      if (jsonData.type === "FeatureCollection") {
-        const substations: Substation[] = [];
-        const lines: TransmissionLine[] = [];
-        const nodes: any[] = [];
-        const links: any[] = [];
+        // Handle GeoJSON format
+        if (jsonData.type === "FeatureCollection") {
+          const substations: Substation[] = [];
+          const lines: TransmissionLine[] = [];
+          const nodes: any[] = [];
+          const links: any[] = [];
 
-        jsonData.features.forEach((feature: any, index: number) => {
-          if (feature.geometry.type === "Point") {
-            // Substation
-            const substation: Substation = {
-              id: feature.properties.id || `substation_${index}`,
-              name: feature.properties.name || `Substation ${index}`,
-              voltage: feature.properties.voltage,
-              coordinates: feature.geometry.coordinates,
-            };
-            substations.push(substation);
+          jsonData.features.forEach((feature: any, index: number) => {
+            if (feature.geometry.type === "Point") {
+              // Substation
+              const substation: Substation = {
+                id: feature.properties.id || `substation_${index}`,
+                name: feature.properties.name || `Substation ${index}`,
+                voltage: feature.properties.voltage,
+                coordinates: feature.geometry.coordinates,
+              };
+              substations.push(substation);
 
-            nodes.push({
-              id: substation.id,
-              name: substation.name,
-              voltage: substation.voltage,
-              x: substation.coordinates?.[0],
-              y: substation.coordinates?.[1],
-              type: "substation",
-            });
-          } else if (feature.geometry.type === "LineString") {
-            // Transmission line
-            const line: TransmissionLine = {
-              id: feature.properties.id || `line_${index}`,
-              from: feature.properties.from,
-              to: feature.properties.to,
-              voltage: feature.properties.voltage,
-              lineType: feature.properties.lineType,
-            };
-            lines.push(line);
+              nodes.push({
+                id: substation.id,
+                name: substation.name,
+                voltage: substation.voltage,
+                x: substation.coordinates?.[0],
+                y: substation.coordinates?.[1],
+                type: "substation",
+              });
+            } else if (feature.geometry.type === "LineString") {
+              // Transmission line
+              const line: TransmissionLine = {
+                id: feature.properties.id || `line_${index}`,
+                from: feature.properties.from,
+                to: feature.properties.to,
+                voltage: feature.properties.voltage,
+                lineType: feature.properties.lineType,
+              };
+              lines.push(line);
 
-            links.push({
-              id: line.id,
-              source: line.from,
-              target: line.to,
-              voltage: line.voltage,
-              lineType: line.lineType,
-            });
-          }
-        });
+              links.push({
+                id: line.id,
+                source: line.from,
+                target: line.to,
+                voltage: line.voltage,
+                lineType: line.lineType,
+              });
+            }
+          });
 
-        return {
-          substations,
-          lines,
-          graphData: { nodes, links },
-        };
+          return {
+            substations,
+            lines,
+            graphData: { nodes, links },
+          };
+        }
+
+        // Handle custom format
+        if (jsonData.substations && jsonData.lines) {
+          const nodes = jsonData.substations.map((sub: any) => ({
+            id: sub.id,
+            name: sub.name,
+            voltage: sub.voltage,
+            x: sub.coordinates?.[0],
+            y: sub.coordinates?.[1],
+            type: "substation",
+          }));
+
+          const links = jsonData.lines.map((line: any) => ({
+            id: line.id,
+            source: line.from,
+            target: line.to,
+            voltage: line.voltage,
+            lineType: line.lineType,
+          }));
+
+          return {
+            substations: jsonData.substations,
+            lines: jsonData.lines,
+            graphData: { nodes, links },
+          };
+        }
+      } catch (jsonError) {
+        // Not JSON, try other formats
       }
 
-      // Handle custom format
-      if (jsonData.substations && jsonData.lines) {
-        const nodes = jsonData.substations.map((sub: any) => ({
-          id: sub.id,
-          name: sub.name,
-          voltage: sub.voltage,
-          x: sub.coordinates?.[0],
-          y: sub.coordinates?.[1],
-          type: "substation",
-        }));
-
-        const links = jsonData.lines.map((line: any) => ({
-          id: line.id,
-          source: line.from,
-          target: line.to,
-          voltage: line.voltage,
-          lineType: line.lineType,
-        }));
-
-        return {
-          substations: jsonData.substations,
-          lines: jsonData.lines,
-          graphData: { nodes, links },
-        };
+      // Handle PSLF format
+      if (data.includes("C PSLF") || data.includes("Bus# Type Area Zone")) {
+        return parsePSLFData(data);
       }
 
-      throw new Error("Unsupported data format");
+      // Handle OpenDSS format
+      if (
+        data.includes("New Circuit") ||
+        data.includes("Generator.") ||
+        data.includes("Load.")
+      ) {
+        return parseOpenDSSData(data);
+      }
+
+      throw new Error(
+        "Unsupported data format. Supported formats: GeoJSON, PSLF, OpenDSS"
+      );
     } catch (error) {
       console.error("Error parsing topology data:", error);
       throw new Error("Failed to parse topology data");
     }
   };
 
+  // Parse PSLF format
+  const parsePSLFData = (data: string): ParsedTopology => {
+    const lines = data.split("\n");
+    const substations: Substation[] = [];
+    const transmissionLines: TransmissionLine[] = [];
+    const nodes: any[] = [];
+    const links: any[] = [];
+
+    // Extract bus data
+    const busLines = lines.filter(
+      (line) =>
+        line.trim().startsWith("C") &&
+        line.includes("Bus#") === false &&
+        line.includes("Type") === false &&
+        line.trim().length > 10 &&
+        !line.includes("Generator") &&
+        !line.includes("Load") &&
+        !line.includes("Line") &&
+        !line.includes("Transformer")
+    );
+
+    busLines.forEach((line, index) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 6) {
+        const busId = parts[1];
+        const busName = parts[5];
+        const voltage = parseFloat(parts[4]);
+
+        const substation: Substation = {
+          id: busId,
+          name: busName,
+          voltage: voltage,
+        };
+        substations.push(substation);
+
+        nodes.push({
+          id: busId,
+          name: busName,
+          voltage: voltage,
+          type: "substation",
+        });
+      }
+    });
+
+    // Extract line data
+    const lineLines = lines.filter(
+      (line) =>
+        line.trim().startsWith("C") &&
+        line.includes("FromBus") === false &&
+        line.includes("ToBus") === false &&
+        line.trim().length > 10 &&
+        line.includes("Line.")
+    );
+
+    lineLines.forEach((line, index) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 8) {
+        const fromBus = parts[1];
+        const toBus = parts[2];
+        const lineId = `line_${fromBus}_${toBus}`;
+
+        const transmissionLine: TransmissionLine = {
+          id: lineId,
+          from: fromBus,
+          to: toBus,
+          voltage: substations.find((s) => s.id === fromBus)?.voltage,
+        };
+        transmissionLines.push(transmissionLine);
+
+        links.push({
+          id: lineId,
+          source: fromBus,
+          target: toBus,
+          voltage: transmissionLine.voltage,
+        });
+      }
+    });
+
+    return {
+      substations,
+      lines: transmissionLines,
+      graphData: { nodes, links },
+    };
+  };
+
+  // Parse OpenDSS format
+  const parseOpenDSSData = (data: string): ParsedTopology => {
+    const lines = data.split("\n");
+    const substations: Substation[] = [];
+    const transmissionLines: TransmissionLine[] = [];
+    const nodes: any[] = [];
+    const links: any[] = [];
+
+    // Create a set to track all referenced buses
+    const referencedBuses = new Set<string>();
+
+    // Extract line data first to get all referenced buses
+    const lineLines = lines.filter(
+      (line) => line.trim().startsWith("Line.") && !line.includes("!")
+    );
+
+    lineLines.forEach((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 4) {
+        const bus1 = parts[1];
+        const bus2 = parts[2];
+        referencedBuses.add(bus1);
+        referencedBuses.add(bus2);
+      }
+    });
+
+    // Extract bus data
+    const busLines = lines.filter(
+      (line) => line.trim().startsWith("Bus.") && !line.includes("!")
+    );
+
+    busLines.forEach((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 4) {
+        const busName = parts[0].replace("Bus.", "");
+        const x = parseFloat(parts[1]);
+        const y = parseFloat(parts[2]);
+
+        // Estimate voltage based on bus name patterns
+        let voltage = 345; // default
+        if (
+          busName.includes("500") ||
+          busName.includes("DC_POWER") ||
+          busName.includes("CHI_WINDY") ||
+          busName.includes("HOU_SPACE") ||
+          busName.includes("LA_ANGEL")
+        ) {
+          voltage = 500;
+        } else if (
+          busName.includes("230") ||
+          busName.includes("PIT_STEEL") ||
+          busName.includes("DET_MOTOR") ||
+          busName.includes("MINN_TWIN") ||
+          busName.includes("PHX_VALLEY") ||
+          busName.includes("SEA_EMERALD")
+        ) {
+          voltage = 230;
+        }
+
+        const substation: Substation = {
+          id: busName,
+          name: busName,
+          voltage: voltage,
+          coordinates: [x, y],
+        };
+        substations.push(substation);
+
+        nodes.push({
+          id: busName,
+          name: busName,
+          voltage: voltage,
+          x: x,
+          y: y,
+          type: "substation",
+        });
+      }
+    });
+
+    // Create nodes for any buses that are referenced in lines but not defined
+    referencedBuses.forEach((busName) => {
+      if (!nodes.find((n) => n.id === busName)) {
+        // Create a default node for referenced but undefined buses
+        const defaultNode = {
+          id: busName,
+          name: busName,
+          voltage: 345, // default voltage
+          x: 0, // default coordinates
+          y: 0,
+          type: "substation",
+        };
+        nodes.push(defaultNode);
+
+        const defaultSubstation: Substation = {
+          id: busName,
+          name: busName,
+          voltage: 345,
+          coordinates: [0, 0],
+        };
+        substations.push(defaultSubstation);
+      }
+    });
+
+    // Now process the lines
+    lineLines.forEach((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 4) {
+        const lineName = parts[0].replace("Line.", "");
+        const bus1 = parts[1];
+        const bus2 = parts[2];
+
+        // Ensure both buses exist in nodes
+        const sourceNode = nodes.find((n) => n.id === bus1);
+        const targetNode = nodes.find((n) => n.id === bus2);
+
+        if (sourceNode && targetNode) {
+          const transmissionLine: TransmissionLine = {
+            id: lineName,
+            from: bus1,
+            to: bus2,
+            voltage: sourceNode.voltage,
+          };
+          transmissionLines.push(transmissionLine);
+
+          links.push({
+            id: lineName,
+            source: bus1,
+            target: bus2,
+            voltage: transmissionLine.voltage,
+          });
+        } else {
+          console.warn(
+            `Missing nodes for line ${lineName}: ${bus1} -> ${bus2}`
+          );
+        }
+      }
+    });
+
+    console.log("OpenDSS Parsed Data:", {
+      nodes: nodes.map((n) => ({ id: n.id, name: n.name })),
+      links: links.map((l) => ({
+        id: l.id,
+        source: l.source,
+        target: l.target,
+      })),
+      substations: substations.length,
+      transmissionLines: transmissionLines.length,
+    });
+
+    return {
+      substations,
+      lines: transmissionLines,
+      graphData: { nodes, links },
+    };
+  };
+
   const handleProcessData = async () => {
-    const dataToProcess =
-      activeTab === "upload"
-        ? fileData
-        : activeTab === "paste"
-        ? pastedData
-        : JSON.stringify(mockGeoJSONData);
+    const dataToProcess = activeTab === "paste" ? pastedData : getDemoData();
 
     if (!dataToProcess.trim()) {
       alert("Please provide data to process");
@@ -249,8 +496,13 @@ export default function GridTopologyExplorer() {
 
     setIsProcessing(true);
     setParsedTopology(null);
+    setDetectedFormat("");
 
     try {
+      // Detect format first
+      const format = detectFormat(dataToProcess);
+      setDetectedFormat(format);
+
       const result = parseTopologyData(dataToProcess);
       setParsedTopology(result);
       console.log("Parsed topology:", result);
@@ -329,7 +581,7 @@ export default function GridTopologyExplorer() {
   };
 
   return (
-    <div className="font-sans grid grid-rows-[5x_1fr_5px] md:grid-rows-[0_1fr_0] items-center justify-items-center min-h-screen p-2 pb-20 gap-2">
+    <div className="font-sans grid grid-rows-[5x_1fr_5px] md:grid-rows-[0_1fr_0] items-center justify-items-center min-h-screen p-2 pb-20 gap-2 ">
       <main className="flex flex-col gap-[16px] row-start-2 items-center sm:items-start max-w-4xl w-full">
         <div className="text-center sm:text-left">
           <h1 className="text-3xl font-bold mb-4">Grid Topology Explorer</h1>
@@ -355,16 +607,6 @@ export default function GridTopologyExplorer() {
               Demo Data
             </button>
             <button
-              onClick={() => setActiveTab("upload")}
-              className={`px-4 py-2 font-medium ${
-                activeTab === "upload"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              File Upload
-            </button>
-            <button
               onClick={() => setActiveTab("paste")}
               className={`px-4 py-2 font-medium ${
                 activeTab === "paste"
@@ -383,116 +625,35 @@ export default function GridTopologyExplorer() {
                 <h3 className="font-medium text-blue-900 mb-2">
                   Demo Data Available
                 </h3>
-                <p className="text-sm text-blue-800">
-                  Click "Process Data" to load sample transmission network data
-                  and see the visualization in action.
+                <p className="text-sm text-blue-800 mb-4">
+                  Select a format and click "Process Data" to load sample
+                  transmission network data and see the visualization in action.
                 </p>
-              </div>
-            </div>
-          )}
 
-          {/* File Upload Tab */}
-          {activeTab === "upload" && (
-            <div className="space-y-4">
-              <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                  isDragOver
-                    ? "border-blue-400 bg-blue-50"
-                    : "border-gray-300 hover:border-blue-400"
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <input
-                  type="file"
-                  accept=".json,.geojson,.txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="space-y-2">
-                    <svg
-                      className={`mx-auto h-12 w-12 ${
-                        isDragOver ? "text-blue-400" : "text-gray-400"
-                      }`}
-                      stroke="currentColor"
-                      fill="none"
-                      viewBox="0 0 48 48"
-                    >
-                      <path
-                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <div
-                      className={`${
-                        isDragOver ? "text-blue-600" : "text-gray-600"
-                      }`}
-                    >
-                      <span className="font-medium">
-                        {isDragOver ? "Drop files here" : "Click to upload"}
-                      </span>
-                      {!isDragOver && " or drag and drop"}
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Supports .json, .geojson, and .txt files
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {/* Selected File Display */}
-              {selectedFile && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <svg
-                        className="h-5 w-5 text-green-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <div>
-                        <h3 className="font-medium text-green-900">
-                          Selected File
-                        </h3>
-                        <p className="text-sm text-green-700">
-                          {selectedFile.name} (
-                          {(selectedFile.size / 1024).toFixed(1)} KB)
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={clearSelectedFile}
-                      className="text-green-600 hover:text-green-800 transition-colors"
-                      title="Remove file"
-                    >
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
+                {/* Format Selection */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Select Demo Format:
+                  </label>
+                  <select
+                    value={demoFormat}
+                    onChange={(e) =>
+                      setDemoFormat(
+                        e.target.value as "GeoJSON" | "PSLF" | "OpenDSS"
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="GeoJSON">
+                      GeoJSON (Geographic JSON format)
+                    </option>
+                    <option value="PSLF">PSLF (Power System Load Flow)</option>
+                    <option value="OpenDSS">
+                      OpenDSS (Open Distribution System Simulator)
+                    </option>
+                  </select>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -572,6 +733,16 @@ export default function GridTopologyExplorer() {
                 Export Data
               </button>
             </div>
+
+            {/* Format Detection */}
+            {detectedFormat && (
+              <div className="mb-4">
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                  <span className="mr-2">Detected Format:</span>
+                  <span className="font-semibold">{detectedFormat}</span>
+                </div>
+              </div>
+            )}
 
             {/* Network Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
