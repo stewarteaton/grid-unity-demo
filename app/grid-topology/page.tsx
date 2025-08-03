@@ -254,39 +254,47 @@ export default function GridTopologyExplorer() {
     const nodes: any[] = [];
     const links: any[] = [];
 
-    // Extract bus data
+    // Extract bus data - look for lines that match the bus data format
     const busLines = lines.filter(
       (line) =>
         line.trim().startsWith("C") &&
         line.includes("Bus#") === false &&
         line.includes("Type") === false &&
+        line.includes("Area") === false &&
+        line.includes("Zone") === false &&
+        line.includes("Transmission Line Data") === false &&
+        line.includes("Generator Data") === false &&
+        line.includes("Load Data") === false &&
+        line.includes("Transformer Data") === false &&
+        line.includes("End of PSLF") === false &&
         line.trim().length > 10 &&
-        !line.includes("Generator") &&
-        !line.includes("Load") &&
-        !line.includes("Line") &&
-        !line.includes("Transformer")
+        // Look for lines that match bus data format: C Bus# Type Area Zone Name BaseKV Angle
+        /^\s*C\s+\d+\s+\d+\s+\d+\s+\d+\s+\w+/.test(line)
     );
 
     busLines.forEach((line, index) => {
       const parts = line.trim().split(/\s+/);
-      if (parts.length >= 6) {
+      if (parts.length >= 7) {
         const busId = parts[1];
         const busName = parts[5];
         const voltage = parseFloat(parts[4]);
 
-        const substation: Substation = {
-          id: busId,
-          name: busName,
-          voltage: voltage,
-        };
-        substations.push(substation);
+        // Only create nodes for valid bus data
+        if (busId && busName && !isNaN(voltage) && voltage > 0) {
+          const substation: Substation = {
+            id: busId,
+            name: busName,
+            voltage: voltage,
+          };
+          substations.push(substation);
 
-        nodes.push({
-          id: busId,
-          name: busName,
-          voltage: voltage,
-          type: "substation",
-        });
+          nodes.push({
+            id: busId,
+            name: busName,
+            voltage: voltage,
+            type: "substation",
+          });
+        }
       }
     });
 
@@ -296,8 +304,16 @@ export default function GridTopologyExplorer() {
         line.trim().startsWith("C") &&
         line.includes("FromBus") === false &&
         line.includes("ToBus") === false &&
+        line.includes("Transmission Line Data") === false &&
         line.trim().length > 10 &&
-        line.includes("Line.")
+        !line.includes("Generator") &&
+        !line.includes("Load") &&
+        !line.includes("Transformer") &&
+        !line.includes("Area") &&
+        !line.includes("Zone") &&
+        !line.includes("End of PSLF") &&
+        // Look for lines that have numeric bus IDs (not header lines)
+        /^\s*C\s+\d+\s+\d+\s+\d+/.test(line)
     );
 
     lineLines.forEach((line, index) => {
@@ -307,21 +323,39 @@ export default function GridTopologyExplorer() {
         const toBus = parts[2];
         const lineId = `line_${fromBus}_${toBus}`;
 
-        const transmissionLine: TransmissionLine = {
-          id: lineId,
-          from: fromBus,
-          to: toBus,
-          voltage: substations.find((s) => s.id === fromBus)?.voltage,
-        };
-        transmissionLines.push(transmissionLine);
+        // Find the source node to get voltage
+        const sourceNode = nodes.find((n) => n.id === fromBus);
+        const targetNode = nodes.find((n) => n.id === toBus);
 
-        links.push({
-          id: lineId,
-          source: fromBus,
-          target: toBus,
-          voltage: transmissionLine.voltage,
-        });
+        if (sourceNode && targetNode) {
+          const transmissionLine: TransmissionLine = {
+            id: lineId,
+            from: fromBus,
+            to: toBus,
+            voltage: sourceNode.voltage,
+          };
+          transmissionLines.push(transmissionLine);
+
+          links.push({
+            id: lineId,
+            source: fromBus,
+            target: toBus,
+            voltage: transmissionLine.voltage,
+          });
+        }
       }
+    });
+
+    console.log("PSLF Parsed Data:", {
+      nodes: nodes.map((n) => ({ id: n.id, name: n.name, voltage: n.voltage })),
+      links: links.map((l) => ({
+        id: l.id,
+        source: l.source,
+        target: l.target,
+        voltage: l.voltage,
+      })),
+      substations: substations.length,
+      transmissionLines: transmissionLines.length,
     });
 
     return {
@@ -844,13 +878,21 @@ export default function GridTopologyExplorer() {
                         <div className="flex justify-between">
                           <span className="text-gray-300">From:</span>
                           <span className="font-semibold">
-                            {String(hoveredLink.source || "Unknown")}
+                            {String(
+                              typeof hoveredLink.source === "object"
+                                ? hoveredLink.source.id
+                                : hoveredLink.source || "Unknown"
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-300">To:</span>
                           <span className="font-semibold">
-                            {String(hoveredLink.target || "Unknown")}
+                            {String(
+                              typeof hoveredLink.target === "object"
+                                ? hoveredLink.target.id
+                                : hoveredLink.target || "Unknown"
+                            )}
                           </span>
                         </div>
                         {hoveredLink.voltage && (
