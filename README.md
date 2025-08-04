@@ -1,27 +1,27 @@
-# Grid Model Interpreter + Load Forecast Playground
+# Grid Topology Explorer + Model Parser (AI) + Schematic Vision (AI)
 
-A Next.js web application that demonstrates grid model parsing, load forecasting, and visualization capabilities for power system analysis.
+A Next.js web application that demonstrates visualization capabilities for power system analysis, grid model parsing, and SLD vision analysis
 
 ## Problem Statement
 
 Power grid operators and engineers need tools to:
 
+- Visualize the grid topology data from files (GeoJSON, PSLF, OpenDSS)
 - Parse and understand complex grid model files (e.g., .raw, .dyr formats)
 - Extract meaningful metadata from load nodes (location, name, base load values)
-- Simulate and forecast load patterns over time
-- Visualize the relationship between actual and forecasted load data
+- Convert schematic image diagrams into useful JSON data using AI vision
 
-This project addresses these needs by providing a user-friendly web interface for grid model interpretation and load forecasting analysis.
+This project addresses these needs by providing a user-friendly web interface for grid visualization, model interpretation, and schematic vision processing.
 
 ## Why I Chose This Project
 
-I selected this project because it demonstrates several key technical competencies:
+I selected this project because it touches several key technical competencies:
 
-1. **File Parsing & Data Processing**: Implementing parsers for industry-standard grid model formats
-2. **Real-time Data Simulation**: Creating realistic load forecasting algorithms
-3. **Data Visualization**: Building interactive charts and graphs for time-series data
-4. **Modern Web Development**: Using Next.js, TypeScript, and Tailwind CSS for a responsive UI
-5. **Domain Knowledge**: Understanding power systems and grid modeling concepts
+1. **UI Visualization**: Enabling graph view of from model text input
+2. **File Parsing & Data Processing**: Implementing parsers for industry-standard grid model formats
+3. **AI Text Analysis**: Leveraging LLM APIs to process model data & provide insights
+4. **AI Vision Processing**: Exracting formatted data from SLD grid image diagrams
+5. **Modern Web Development**: Using Next.js, TypeScript, and Tailwind CSS for a responsive UI
 
 This project showcases both technical implementation skills and domain expertise relevant to GridUnity's power systems focus.
 
@@ -29,8 +29,26 @@ This project showcases both technical implementation skills and domain expertise
 
 ### Prerequisites
 
+- OpenAI API Key (for AI features)
 - Node.js 18+
 - npm, yarn, pnpm, or bun
+
+### Environment Setup
+
+Create a `.env.local` file in the root directory and add your OpenAI API key:
+
+```bash
+# Create .env.local file
+touch .env.local
+```
+
+Add the following to your `.env.local` file:
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+**Note**: Replace `your_openai_api_key_here` with your actual OpenAI API key. You can get one from [OpenAI's platform](https://platform.openai.com/api-keys).
 
 ### Installation
 
@@ -77,89 +95,33 @@ npm run build
 npm run start
 ```
 
-## Features
+## Technical Decisions, Tradeoffs, & Next Steps
 
-### 1. Grid Model Parser
+Technical Decisions
 
-- Supports common grid model formats (.raw, .dyr)
-- Extracts load node metadata (location, name, base load values)
-- Validates file format and data integrity
+- I decided to leverage AI to generate mock data to use for the Grid Topology Explorer, and to create local parsing functions to translate the mock data into useful metrics like substations, lines, voltage, etc.
+- I also decided to let AI determine how to create the prompts for OpenAI API to determine which metrics are useful given that I'm not educated in electrical grid domain
+- By using NextJS and typescript, it allows me to quickly build a full stack app integrating responsive UIs connected with API
 
-### 2. Load Node Analysis
+Trade Offs
 
-- Displays extracted node information in a structured format
-- Shows geographical distribution of load nodes
-- Provides filtering and search capabilities
+- Because I was building this demo in a hurry, I didn't have time to search for bugs, implement testing, or verify that the parsing functions are all working as expected
+- I also couldn't spend too much time doing research to verify if the AI analysis was useful for people in the industry
 
-### 3. Load Forecasting Simulation
+Next Steps
 
-- Simulates load patterns over time for selected nodes
-- Implements realistic forecasting algorithms
-- Supports different time horizons (hourly, daily, weekly)
-
-### 4. Data Visualization
-
-- Interactive charts showing actual vs forecasted load
-- Time-series visualization with zoom and pan capabilities
-- Export functionality for reports and analysis
-
-## Technical Decisions & Tradeoffs
+- Given more time I would setup testing and validate that the outputs from each feature were valuable to users
 
 ### Architecture
 
 - **Next.js App Router**: Chosen for modern React patterns and built-in optimizations
 - **TypeScript**: For type safety and better developer experience
 - **Tailwind CSS**: For rapid UI development and consistent styling
-
-### Data Processing
-
-- **Client-side parsing**: For immediate feedback and no server dependencies
-- **Web Workers**: For heavy parsing operations to avoid blocking the UI
-- **Local storage**: For caching parsed models and user preferences
-
-### Visualization
-
-- **Chart.js/Recharts**: For responsive and interactive charts
-- **Real-time updates**: Using React state management for dynamic data
-
-## Next Steps
-
-### Short-term (1-2 weeks)
-
-- [ ] Implement grid model file parser (.raw, .dyr formats)
-- [ ] Create load node metadata extraction
-- [ ] Build basic load forecasting simulation
-- [ ] Add interactive chart visualization
-- [ ] Implement file upload and validation
-
-### Medium-term (1-2 months)
-
-- [ ] Add support for additional grid model formats
-- [ ] Implement more sophisticated forecasting algorithms
-- [ ] Add geographical visualization (maps)
-- [ ] Create user authentication and data persistence
-- [ ] Add export/import functionality
-
-### Long-term (3+ months)
-
-- [ ] Real-time data integration with power system databases
-- [ ] Advanced analytics and machine learning forecasting
-- [ ] Multi-user collaboration features
-- [ ] API development for third-party integrations
-- [ ] Mobile application development
+- **React Force Graph**: To visualize substation nodes and transmission lines
 
 ## Technology Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript
 - **Styling**: Tailwind CSS 4
-- **Charts**: Chart.js or Recharts (TBD)
-- **File Processing**: Custom parsers + Web Workers
-- **Deployment**: Vercel (recommended)
-
-## Contributing
-
-This is a take-home interview project for GridUnity. For questions or feedback, please contact the development team.
-
-## License
-
-This project is created for demonstration purposes as part of a technical interview process.
+- **API**: Node.js, Typescript
+- **Integartions**: OpenAI API
