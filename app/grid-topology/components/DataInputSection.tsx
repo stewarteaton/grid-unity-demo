@@ -1,4 +1,7 @@
 import { ActiveTab, DemoFormat } from "../types";
+import { useState } from "react";
+import { mockGeoJSONData } from "../mock-data/GeoJSON";
+import { mockPSLFData, mockOpenDSSData } from "../mock-data";
 
 interface DataInputSectionProps {
   activeTab: ActiveTab;
@@ -21,6 +24,136 @@ export const DataInputSection = ({
   isProcessing,
   onProcessData,
 }: DataInputSectionProps) => {
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Get preview data based on current state
+  const getPreviewData = () => {
+    if (activeTab === "demo") {
+      switch (demoFormat) {
+        case "PSLF":
+          return mockPSLFData;
+        case "OpenDSS":
+          return mockOpenDSSData;
+        case "GeoJSON":
+        default:
+          return JSON.stringify(mockGeoJSONData, null, 2);
+      }
+    } else {
+      return pastedData || "No data pasted yet...";
+    }
+  };
+
+  const formatData = (data: string) => {
+    try {
+      // Try to parse as JSON and format it
+      const parsed = JSON.parse(data);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      // If not JSON, return as is
+      return data;
+    }
+  };
+
+  const isJsonData = (data: string) => {
+    try {
+      JSON.parse(data);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const getLanguageClass = () => {
+    const data = getPreviewData();
+    if (isJsonData(data)) return "language-json";
+    if (data.includes("C PSLF")) return "language-text";
+    if (data.includes("New Circuit")) return "language-text";
+    return "language-text";
+  };
+
+  const getDataStats = () => {
+    const data = getPreviewData();
+    if (activeTab === "demo") {
+      switch (demoFormat) {
+        case "GeoJSON":
+          const geoJson = mockGeoJSONData;
+          return {
+            substations: geoJson.features.filter(
+              (f) => f.geometry.type === "Point"
+            ).length,
+            lines: geoJson.features.filter(
+              (f) => f.geometry.type === "LineString"
+            ).length,
+            format: "GeoJSON",
+          };
+        case "PSLF":
+          const pslfLines = mockPSLFData
+            .split("\n")
+            .filter(
+              (line) =>
+                line.trim().startsWith("C") &&
+                !line.includes("Bus#") &&
+                !line.includes("Type") &&
+                !line.includes("Area") &&
+                !line.includes("Zone") &&
+                !line.includes("Generator") &&
+                !line.includes("Load") &&
+                !line.includes("Transformer") &&
+                !line.includes("End of PSLF") &&
+                line.trim().length > 10
+            );
+          const busLines = mockPSLFData
+            .split("\n")
+            .filter(
+              (line) =>
+                line.trim().startsWith("C") &&
+                line.includes("Bus#") === false &&
+                line.includes("Type") === false &&
+                line.includes("Area") === false &&
+                line.includes("Zone") === false &&
+                line.includes("Transmission Line Data") === false &&
+                line.includes("Generator Data") === false &&
+                line.includes("Load Data") === false &&
+                line.includes("Transformer Data") === false &&
+                line.includes("End of PSLF") === false &&
+                line.trim().length > 10 &&
+                /^\s*C\s+\d+\s+\d+\s+\d+\s+\d+\s+\w+/.test(line)
+            );
+          return {
+            substations: busLines.length,
+            lines: pslfLines.length,
+            format: "PSLF",
+          };
+        case "OpenDSS":
+          const openDssLines = mockOpenDSSData
+            .split("\n")
+            .filter(
+              (line) => line.trim().startsWith("Line.") && !line.includes("!")
+            );
+          const openDssBuses = mockOpenDSSData
+            .split("\n")
+            .filter(
+              (line) => line.trim().startsWith("Bus.") && !line.includes("!")
+            );
+          return {
+            substations: openDssBuses.length,
+            lines: openDssLines.length,
+            format: "OpenDSS",
+          };
+        default:
+          return { substations: 0, lines: 0, format: "Unknown" };
+      }
+    } else {
+      return {
+        substations: 0,
+        lines: 0,
+        format: isJsonData(pastedData) ? "JSON" : "Text",
+      };
+    }
+  };
+
+  const stats = getDataStats();
+
   return (
     <div className="w-full bg-white rounded-lg shadow-lg p-6 border border-gray-200">
       <h2 className="text-2xl font-semibold mb-4">Upload Topology Data</h2>
@@ -80,6 +213,28 @@ export const DataInputSection = ({
                 </option>
               </select>
             </div>
+
+            {/* Data Stats */}
+            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+              <div className="bg-white rounded p-2 text-center">
+                <div className="font-semibold text-blue-600">
+                  {stats.substations}
+                </div>
+                <div className="text-gray-600">Substations</div>
+              </div>
+              <div className="bg-white rounded p-2 text-center">
+                <div className="font-semibold text-green-600">
+                  {stats.lines}
+                </div>
+                <div className="text-gray-600">Lines</div>
+              </div>
+              <div className="bg-white rounded p-2 text-center">
+                <div className="font-semibold text-purple-600">
+                  {stats.format}
+                </div>
+                <div className="text-gray-600">Format</div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -97,7 +252,7 @@ export const DataInputSection = ({
             <textarea
               id="pasted-data"
               rows={10}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
               placeholder="Paste your GeoJSON, JSON, or custom topology data here..."
               value={pastedData}
               onChange={(e) => setPastedData(e.target.value)}
@@ -105,6 +260,69 @@ export const DataInputSection = ({
           </div>
         </div>
       )}
+
+      {/* Data Preview Section */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-medium text-gray-900">Data Preview</h3>
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="flex items-center space-x-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${
+                showPreview ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+            <span>{showPreview ? "Hide" : "Show"} Preview</span>
+          </button>
+        </div>
+
+        {showPreview && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {activeTab === "demo" ? "Demo" : "Pasted"} Data Preview
+              </span>
+              <span className="text-xs text-gray-500">
+                {getPreviewData().length} characters
+              </span>
+            </div>
+            <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
+              <pre className="p-4 text-sm overflow-x-auto max-h-64 overflow-y-auto">
+                <code className={getLanguageClass()}>
+                  {formatData(getPreviewData())}
+                </code>
+              </pre>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {activeTab === "demo" && (
+                <span>
+                  Format: <span className="font-medium">{stats.format}</span> •
+                  Substations:{" "}
+                  <span className="font-medium">{stats.substations}</span> •
+                  Lines: <span className="font-medium">{stats.lines}</span>
+                </span>
+              )}
+              {activeTab === "paste" && (
+                <span>
+                  {isJsonData(pastedData) ? "Valid JSON" : "Text format"}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Process Button */}
       <div className="mt-6">
