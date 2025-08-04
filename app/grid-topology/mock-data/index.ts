@@ -12,6 +12,7 @@ export interface MockDataFormat {
   name: string;
   description: string;
   data: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formatted?: any;
 }
 

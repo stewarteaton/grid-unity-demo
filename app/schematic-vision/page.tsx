@@ -19,7 +19,6 @@ export default function SchematicVision() {
     isDragOver,
     currentStep,
     setResult,
-    setIsProcessing,
     handleImageUpload,
     clearSelectedImage,
     handleDragOver,
@@ -65,7 +64,7 @@ export default function SchematicVision() {
           </h1>
           <p className="text-lg text-gray-600">
             Upload an image of a single-line diagram (SLD) and get intelligent
-            data extraction using OpenAI's vision capabilities.
+            data extraction using OpenAI&apos;s vision capabilities.
           </p>
         </div>
 

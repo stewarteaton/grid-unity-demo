@@ -9,8 +9,19 @@ interface SchematicRequest {
 
 interface SchematicResponse {
   success: boolean;
-  data: any;
+  data: SchematicAnalysisData;
   filename?: string;
+}
+
+interface SchematicAnalysisData {
+  raw_response?: string;
+  extracted_data?: {
+    message: string;
+    content: string;
+  };
+  parsing_error?: string;
+  content?: string;
+  [key: string]: unknown;
 }
 
 interface ErrorResponse {
@@ -58,12 +69,12 @@ const openai = new OpenAI({
 });
 
 // Validation functions
-function validateRequest(body: any): body is SchematicRequest {
+function validateRequest(body: unknown): body is SchematicRequest {
   return (
     typeof body === "object" &&
     body !== null &&
-    typeof body.image === "string" &&
-    body.image.length > 0
+    typeof (body as SchematicRequest).image === "string" &&
+    (body as SchematicRequest).image.length > 0
   );
 }
 
@@ -72,7 +83,7 @@ function validateEnvironment(): boolean {
 }
 
 // JSON parsing utilities
-function extractJsonFromResponse(content: string): any {
+function extractJsonFromResponse(content: string): SchematicAnalysisData {
   try {
     // Look for JSON in the response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -88,7 +99,7 @@ function extractJsonFromResponse(content: string): any {
         content: content,
       },
     };
-  } catch (parseError) {
+  } catch {
     // If JSON parsing fails, return the raw response
     return {
       raw_response: content,
@@ -157,7 +168,7 @@ export async function POST(
     // Analyze schematic
     const analysisContent = await analyzeSchematic(body.image);
     console.log({ analysisContent });
-    
+
     // Parse response
     const jsonData = extractJsonFromResponse(analysisContent);
     console.log({ jsonData });

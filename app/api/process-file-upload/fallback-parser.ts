@@ -7,13 +7,34 @@ import {
 // FALLBACK PARSER (for when OpenAI is not available)
 // ============================================================================
 
+interface BusData {
+  id: number;
+  name: string;
+  voltage: number;
+  vm: number;
+  va: number;
+}
+
+interface LoadData {
+  bus_id: number;
+  mw: number;
+  mvar: number;
+}
+
+interface BranchData {
+  from: number;
+  to: number;
+  r: number;
+  x: number;
+}
+
 export function parseRaw(fileContent: string): ParsedPowerSystemData {
   const basePowerMatch = fileContent.match(/([0-9.]+).*MVA base/);
   const base_power = basePowerMatch ? parseFloat(basePowerMatch[1]) : undefined;
 
-  const buses: any[] = [];
-  const loads: any[] = [];
-  const branches: any[] = [];
+  const buses: BusData[] = [];
+  const loads: LoadData[] = [];
+  const branches: BranchData[] = [];
 
   let section = "";
   for (const line of fileContent.split("\n")) {

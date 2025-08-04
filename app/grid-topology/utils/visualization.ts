@@ -7,16 +7,19 @@ export const getVoltageColor = (voltage?: number) => {
   return "#666"; // Gray for others
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getNodeColor = (node: any) => {
   if (!node) return "#666";
   return getVoltageColor(node.voltage);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getLinkColor = (link: any) => {
   if (!link) return "#666";
   return getVoltageColor(link.voltage);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getNodeLabel = (node: any) => {
   if (!node) return "";
   const name = node.name || "Unknown";
@@ -24,6 +27,7 @@ export const getNodeLabel = (node: any) => {
   return `${name} (${id})`;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getLinkLabel = (link: any) => {
   if (!link) return "";
   const source = link.source || "Unknown";
@@ -31,6 +35,7 @@ export const getLinkLabel = (link: any) => {
   return `${source} → ${target}`;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const exportGraphData = (parsedTopology: any) => {
   if (!parsedTopology) return;
 

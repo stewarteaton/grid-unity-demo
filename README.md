@@ -111,6 +111,8 @@ Trade Offs
 Next Steps
 
 - Given more time I would setup testing and validate that the outputs from each feature were valuable to users
+- Make the system more robust to handle different types of data inputs, or require specified formats
+- I would also improve the OpenAI API request by using structured output to guarentee that we're receiving JSON in the desired format
 
 ### Architecture
 

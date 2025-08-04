@@ -15,7 +15,7 @@ export const detectFormat = (data: string): string => {
     if (jsonData.substations && jsonData.lines) {
       return "Custom JSON";
     }
-  } catch (jsonError) {
+  } catch {
     // Not JSON, check other formats
   }
 
@@ -49,7 +49,7 @@ export const parseTopologyData = (data: string): ParsedTopology => {
       if (jsonData.substations && jsonData.lines) {
         return parseCustomJSONData(jsonData);
       }
-    } catch (jsonError) {
+    } catch {
       // Not JSON, try other formats
     }
 
@@ -76,12 +76,14 @@ export const parseTopologyData = (data: string): ParsedTopology => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parseGeoJSONData = (jsonData: any): ParsedTopology => {
   const substations: Substation[] = [];
   const lines: TransmissionLine[] = [];
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   jsonData.features.forEach((feature: any, index: number) => {
     if (feature.geometry.type === "Point") {
       // Substation
@@ -129,7 +131,9 @@ const parseGeoJSONData = (jsonData: any): ParsedTopology => {
   };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parseCustomJSONData = (jsonData: any): ParsedTopology => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nodes = jsonData.substations.map((sub: any) => ({
     id: sub.id,
     name: sub.name,
@@ -139,6 +143,7 @@ const parseCustomJSONData = (jsonData: any): ParsedTopology => {
     type: "substation" as const,
   }));
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const links = jsonData.lines.map((line: any) => ({
     id: line.id,
     source: line.from,
@@ -217,7 +222,6 @@ const parsePSLFData = (data: string): ParsedTopology => {
 
   // Find the transmission line data section
   let inTransmissionSection = false;
-  let inTransformerSection = false;
 
   lines.forEach((line) => {
     const trimmedLine = line.trim();
@@ -225,13 +229,11 @@ const parsePSLFData = (data: string): ParsedTopology => {
     // Check for section headers
     if (trimmedLine.includes("Transmission Line Data")) {
       inTransmissionSection = true;
-      inTransformerSection = false;
       return;
     }
 
     if (trimmedLine.includes("Transformer Data")) {
       inTransmissionSection = false;
-      inTransformerSection = true;
       return;
     }
 
@@ -241,7 +243,6 @@ const parsePSLFData = (data: string): ParsedTopology => {
       trimmedLine.includes("End of PSLF")
     ) {
       inTransmissionSection = false;
-      inTransformerSection = false;
       return;
     }
 

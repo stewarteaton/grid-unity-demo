@@ -11,13 +11,20 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 interface NetworkVisualizationProps {
   parsedTopology: ParsedTopology | null;
   detectedFormat: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hoveredNode: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hoveredLink: any;
   mousePosition: MousePosition | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   graphRef: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onNodeHover: (node: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onLinkHover: (link: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onNodeClick: (node: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onLinkClick: (link: any) => void;
   onExportData: () => void;
 }
@@ -257,7 +264,7 @@ export const NetworkVisualization = ({
                 onLinkClick={onLinkClick}
                 onEngineStop={() => {
                   // Center the graph when the physics engine stops
-                  if (graphRef.current) {
+                  if (graphRef && graphRef.current) {
                     graphRef.current.centerAt(0, 0, 1000);
                     graphRef.current.zoom(1.2, 1000);
                   }

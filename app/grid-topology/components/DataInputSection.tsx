@@ -72,7 +72,6 @@ export const DataInputSection = ({
   };
 
   const getDataStats = () => {
-    const data = getPreviewData();
     if (activeTab === "demo") {
       switch (demoFormat) {
         case "GeoJSON":
@@ -203,7 +202,7 @@ export const DataInputSection = ({
               Demo Data Available
             </h3>
             <p className="text-sm text-blue-800 mb-4">
-              Select a format and click "Process Data" to load sample
+              Select a format and click &quot;Process Data&quot; to load sample
               transmission network data and see the visualization in action.
             </p>
 

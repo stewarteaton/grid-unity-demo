@@ -36,6 +36,7 @@ export function ResultsDisplay({ result }: ResultsDisplayProps) {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderJsonData = (data: any, level: number = 0): React.ReactNode => {
     if (typeof data === "object" && data !== null) {
       if (Array.isArray(data)) {
@@ -62,7 +63,7 @@ export function ResultsDisplay({ result }: ResultsDisplayProps) {
             <div className="ml-4">
               {Object.entries(data).map(([key, value], index) => (
                 <div key={key}>
-                  <span className="text-green-600">"{key}"</span>
+                  <span className="text-green-600">&quot;{key}&quot;</span>
                   <span className="text-gray-500">: </span>
                   {renderJsonData(value, level + 1)}
                   {index < Object.keys(data).length - 1 && (
@@ -76,7 +77,7 @@ export function ResultsDisplay({ result }: ResultsDisplayProps) {
         );
       }
     } else if (typeof data === "string") {
-      return <span className="text-orange-600">"{data}"</span>;
+      return <span className="text-orange-600">&quot;{data}&quot;</span>;
     } else if (typeof data === "number") {
       return <span className="text-purple-600">{data}</span>;
     } else if (typeof data === "boolean") {
@@ -132,7 +133,11 @@ export function ResultsDisplay({ result }: ResultsDisplayProps) {
             The analysis has identified electrical components, connections, and
             system topology from your single-line diagram. The extracted data
             includes component types, ratings, connections, and system
-            structure.
+            characteristics.
+          </p>
+          <p className="mt-2">
+            You can use this structured data for further analysis,
+            documentation, or integration with power system analysis tools.
           </p>
         </div>
       </div>

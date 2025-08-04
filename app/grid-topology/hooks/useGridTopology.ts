@@ -11,11 +11,18 @@ export const useGridTopology = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>("demo");
   const [demoFormat, setDemoFormat] = useState<DemoFormat>("GeoJSON");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [parsedTopology, setParsedTopology] = useState<ParsedTopology | null>(null);
+  const [parsedTopology, setParsedTopology] = useState<ParsedTopology | null>(
+    null
+  );
   const [detectedFormat, setDetectedFormat] = useState<string>("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hoveredNode, setHoveredNode] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hoveredLink, setHoveredLink] = useState<any>(null);
-  const [mousePosition, setMousePosition] = useState<MousePosition | null>(null);
+  const [mousePosition, setMousePosition] = useState<MousePosition | null>(
+    null
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
 
   // Add mouse move handler to track position globally
@@ -84,18 +91,22 @@ export const useGridTopology = () => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleNodeHover = useCallback((node: any) => {
     setHoveredNode(node);
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleLinkHover = useCallback((link: any) => {
     setHoveredLink(link);
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleNodeClick = useCallback((node: any) => {
     console.log("Clicked node:", node);
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleLinkClick = useCallback((link: any) => {
     console.log("Clicked link:", link);
   }, []);
@@ -121,7 +132,7 @@ export const useGridTopology = () => {
     hoveredLink,
     mousePosition,
     graphRef,
-    
+
     // Actions
     handleProcessData,
     handleNodeHover,
@@ -131,4 +142,4 @@ export const useGridTopology = () => {
     handleExportData,
     getDemoData,
   };
-}; 
+};
