@@ -259,7 +259,7 @@ export const NetworkVisualization = ({
                   // Center the graph when the physics engine stops
                   if (graphRef.current) {
                     graphRef.current.centerAt(0, 0, 1000);
-                    graphRef.current.zoom(1.5, 1000);
+                    graphRef.current.zoom(1.2, 1000);
                   }
                 }}
               />

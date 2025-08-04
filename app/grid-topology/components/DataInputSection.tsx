@@ -87,21 +87,34 @@ export const DataInputSection = ({
             format: "GeoJSON",
           };
         case "PSLF":
-          const pslfLines = mockPSLFData
-            .split("\n")
-            .filter(
-              (line) =>
-                line.trim().startsWith("C") &&
-                !line.includes("Bus#") &&
-                !line.includes("Type") &&
-                !line.includes("Area") &&
-                !line.includes("Zone") &&
-                !line.includes("Generator") &&
-                !line.includes("Load") &&
-                !line.includes("Transformer") &&
-                !line.includes("End of PSLF") &&
-                line.trim().length > 10
-            );
+          // Count actual transmission lines (not transformers)
+          const pslfLines = mockPSLFData.split("\n");
+          let inTransmissionSection = false;
+          let transmissionLineCount = 0;
+
+          pslfLines.forEach((line) => {
+            const trimmedLine = line.trim();
+
+            if (trimmedLine.includes("Transmission Line Data")) {
+              inTransmissionSection = true;
+            } else if (
+              trimmedLine.includes("Transformer Data") ||
+              trimmedLine.includes("Area Data") ||
+              trimmedLine.includes("Zone Data") ||
+              trimmedLine.includes("End of PSLF")
+            ) {
+              inTransmissionSection = false;
+            } else if (
+              inTransmissionSection &&
+              trimmedLine.startsWith("C") &&
+              !trimmedLine.includes("FromBus") &&
+              !trimmedLine.includes("ToBus") &&
+              trimmedLine.length > 10
+            ) {
+              transmissionLineCount++;
+            }
+          });
+
           const busLines = mockPSLFData
             .split("\n")
             .filter(
@@ -121,7 +134,7 @@ export const DataInputSection = ({
             );
           return {
             substations: busLines.length,
-            lines: pslfLines.length,
+            lines: transmissionLineCount,
             format: "PSLF",
           };
         case "OpenDSS":

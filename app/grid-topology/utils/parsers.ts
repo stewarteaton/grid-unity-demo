@@ -188,10 +188,18 @@ const parsePSLFData = (data: string): ParsedTopology => {
 
       // Only create nodes for valid bus data
       if (busId && busName && !isNaN(voltage) && voltage > 0) {
+        // Create a simple grid layout for PSLF nodes
+        const gridSize = Math.ceil(Math.sqrt(busLines.length));
+        const row = Math.floor(index / gridSize);
+        const col = index % gridSize;
+        const x = (col - gridSize / 2) * 100;
+        const y = (row - gridSize / 2) * 100;
+
         const substation: Substation = {
           id: busId,
           name: busName,
           voltage: voltage,
+          coordinates: [x, y],
         };
         substations.push(substation);
 
@@ -199,56 +207,77 @@ const parsePSLFData = (data: string): ParsedTopology => {
           id: busId,
           name: busName,
           voltage: voltage,
+          x: x,
+          y: y,
           type: "substation",
         });
       }
     }
   });
 
-  // Extract line data
-  const lineLines = lines.filter(
-    (line) =>
-      line.trim().startsWith("C") &&
-      line.includes("FromBus") === false &&
-      line.includes("ToBus") === false &&
-      line.includes("Transmission Line Data") === false &&
-      line.trim().length > 10 &&
-      !line.includes("Generator") &&
-      !line.includes("Load") &&
-      !line.includes("Transformer") &&
-      !line.includes("Area") &&
-      !line.includes("Zone") &&
-      !line.includes("End of PSLF") &&
-      // Look for lines that have numeric bus IDs (not header lines)
-      /^\s*C\s+\d+\s+\d+\s+\d+/.test(line)
-  );
+  // Find the transmission line data section
+  let inTransmissionSection = false;
+  let inTransformerSection = false;
 
-  lineLines.forEach((line, index) => {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length >= 8) {
-      const fromBus = parts[1];
-      const toBus = parts[2];
-      const lineId = `line_${fromBus}_${toBus}`;
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
 
-      // Find the source node to get voltage
-      const sourceNode = nodes.find((n) => n.id === fromBus);
-      const targetNode = nodes.find((n) => n.id === toBus);
+    // Check for section headers
+    if (trimmedLine.includes("Transmission Line Data")) {
+      inTransmissionSection = true;
+      inTransformerSection = false;
+      return;
+    }
 
-      if (sourceNode && targetNode) {
-        const transmissionLine: TransmissionLine = {
-          id: lineId,
-          from: fromBus,
-          to: toBus,
-          voltage: sourceNode.voltage,
-        };
-        transmissionLines.push(transmissionLine);
+    if (trimmedLine.includes("Transformer Data")) {
+      inTransmissionSection = false;
+      inTransformerSection = true;
+      return;
+    }
 
-        links.push({
-          id: lineId,
-          source: fromBus,
-          target: toBus,
-          voltage: transmissionLine.voltage,
-        });
+    if (
+      trimmedLine.includes("Area Data") ||
+      trimmedLine.includes("Zone Data") ||
+      trimmedLine.includes("End of PSLF")
+    ) {
+      inTransmissionSection = false;
+      inTransformerSection = false;
+      return;
+    }
+
+    // Process transmission lines (not transformers)
+    if (
+      inTransmissionSection &&
+      trimmedLine.startsWith("C") &&
+      !trimmedLine.includes("FromBus") &&
+      !trimmedLine.includes("ToBus")
+    ) {
+      const parts = trimmedLine.split(/\s+/);
+      if (parts.length >= 8) {
+        const fromBus = parts[1];
+        const toBus = parts[2];
+        const lineId = `line_${fromBus}_${toBus}`;
+
+        // Find the source node to get voltage
+        const sourceNode = nodes.find((n) => n.id === fromBus);
+        const targetNode = nodes.find((n) => n.id === toBus);
+
+        if (sourceNode && targetNode) {
+          const transmissionLine: TransmissionLine = {
+            id: lineId,
+            from: fromBus,
+            to: toBus,
+            voltage: sourceNode.voltage,
+          };
+          transmissionLines.push(transmissionLine);
+
+          links.push({
+            id: lineId,
+            source: fromBus,
+            target: toBus,
+            voltage: transmissionLine.voltage,
+          });
+        }
       }
     }
   });
