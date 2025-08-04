@@ -1,4 +1,7 @@
-import { ProcessingResult } from "../../../types/power-system";
+import {
+  ProcessingResult,
+  ProcessingResultSchema,
+} from "../../../types/power-system";
 
 export const useConnect = () => {
   const processData = async (
@@ -24,7 +27,7 @@ export const useConnect = () => {
         // Add small delays between steps to show progress
         if (i < steps.length - 1) {
           await new Promise((resolve) =>
-            setTimeout(resolve, 800 + Math.random() * 400)
+            setTimeout(resolve, 1200 + Math.random() * 400)
           );
         }
       }
@@ -46,10 +49,22 @@ export const useConnect = () => {
         throw new Error(errorData.error || "Failed to process data");
       }
 
-      const result = await response.json();
-      return result;
+      const rawResult = await response.json();
+
+      // Validate the response with Zod
+      const validatedResult = ProcessingResultSchema.parse(rawResult);
+      return validatedResult;
     } catch (error) {
       console.error("Error processing data:", error);
+
+      // If it's a Zod validation error, provide more specific error
+      if (error instanceof Error && error.message.includes("Zod")) {
+        return {
+          success: false,
+          error: "Invalid response format from server",
+        };
+      }
+
       return {
         success: false,
         error:

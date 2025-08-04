@@ -1,99 +1,124 @@
-export interface Bus {
-  id: number;
-  name: string;
-  voltage: number;
-  vm: number;
-  va: number;
-}
+import { z } from "zod";
 
-export interface Load {
-  bus_id: number;
-  mw: number;
-  mvar: number;
-}
+// Zod schemas derived from TypeScript types
+export const BusSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  voltage: z.number(),
+  vm: z.number(),
+  va: z.number(),
+});
 
-export interface Branch {
-  from: number;
-  to: number;
-  r: number;
-  x: number;
-}
+export const LoadSchema = z.object({
+  bus_id: z.number(),
+  mw: z.number(),
+  mvar: z.number(),
+});
 
-export interface Generator {
-  id: number;
-  bus_id: number;
-  type?: string;
-  base_mva?: number;
-  inertia?: number;
-}
+export const BranchSchema = z.object({
+  from: z.number(),
+  to: z.number(),
+  r: z.number(),
+  x: z.number(),
+});
 
-export interface ParsedPowerSystemData {
-  format: string;
-  base_power?: number;
-  buses?: Bus[];
-  loads?: Load[];
-  branches?: Branch[];
-  generators?: Generator[];
-}
+export const GeneratorSchema = z.object({
+  id: z.number(),
+  bus_id: z.number(),
+  type: z.string().optional(),
+  base_mva: z.number().optional(),
+  inertia: z.number().optional(),
+});
 
-export interface SystemSummary {
-  totalBuses: number;
-  totalLoads: number;
-  totalBranches: number;
-  totalGenerators: number;
-  basePower?: number;
-  systemVoltageLevel?: string;
-}
+export const ParsedPowerSystemDataSchema = z.object({
+  format: z.string(),
+  base_power: z.number().optional(),
+  buses: z.array(BusSchema).optional(),
+  loads: z.array(LoadSchema).optional(),
+  branches: z.array(BranchSchema).optional(),
+  generators: z.array(GeneratorSchema).optional(),
+});
 
-export interface LoadAnalysis {
-  totalLoadMW: number;
-  totalLoadMVAR: number;
-  peakLoadBus?: {
-    busId: number;
-    loadMW: number;
-    loadMVAR: number;
-  };
-  loadDistribution?: Array<{
-    busId: number;
-    percentageMW: number;
-    percentageMVAR: number;
-  }>;
-}
+export const SystemSummarySchema = z.object({
+  totalBuses: z.number(),
+  totalLoads: z.number(),
+  totalBranches: z.number(),
+  totalGenerators: z.number(),
+  basePower: z.number().optional(),
+  systemVoltageLevel: z.string().optional(),
+});
 
-export interface TopologyAnalysis {
-  connections: Array<{
-    fromBus: number;
-    toBus: number;
-    impedance: string;
-  }>;
-  networkType: string;
-  criticalPath: string;
-}
+export const LoadAnalysisSchema = z.object({
+  totalLoadMW: z.number(),
+  totalLoadMVAR: z.number(),
+  peakLoadBus: z
+    .object({
+      busId: z.number(),
+      loadMW: z.number(),
+      loadMVAR: z.number(),
+    })
+    .optional(),
+  loadDistribution: z
+    .array(
+      z.object({
+        busId: z.number(),
+        percentageMW: z.number(),
+        percentageMVAR: z.number(),
+      })
+    )
+    .optional(),
+});
 
-export interface SystemRecommendations {
-  voltageRegulation?: string;
-  loadBalancing?: string;
-  lossReduction?: string;
-}
+export const TopologyAnalysisSchema = z.object({
+  connections: z.array(
+    z.object({
+      fromBus: z.number(),
+      toBus: z.number(),
+      impedance: z.string(),
+    })
+  ),
+  networkType: z.string(),
+  criticalPath: z.string(),
+});
 
-export interface SystemIssues {
-  voltageDrop?: string;
-  reactivePowerSupport?: string;
-  noGenerators?: string;
-}
+export const SystemRecommendationsSchema = z.object({
+  voltageRegulation: z.string().optional(),
+  loadBalancing: z.string().optional(),
+  lossReduction: z.string().optional(),
+});
 
-export interface AnalysisResult {
-  summary: SystemSummary;
-  loadAnalysis: LoadAnalysis;
-  topology: TopologyAnalysis;
-  recommendations: SystemRecommendations;
-  issues: SystemIssues;
-}
+export const SystemIssuesSchema = z.object({
+  voltageDrop: z.string().optional(),
+  reactivePowerSupport: z.string().optional(),
+  noGenerators: z.string().optional(),
+});
 
-export interface ProcessingResult {
-  success: boolean;
-  parsedData?: ParsedPowerSystemData;
-  analysis?: AnalysisResult;
-  message?: string;
-  error?: string;
-}
+export const AnalysisResultSchema = z.object({
+  summary: SystemSummarySchema.optional(),
+  loadAnalysis: LoadAnalysisSchema.optional(),
+  topology: TopologyAnalysisSchema.optional(),
+  recommendations: SystemRecommendationsSchema.optional(),
+  issues: SystemIssuesSchema.optional(),
+});
+
+export const ProcessingResultSchema = z.object({
+  success: z.boolean(),
+  parsedData: ParsedPowerSystemDataSchema.optional(),
+  analysis: AnalysisResultSchema.optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
+
+// TypeScript types derived from Zod schemas
+export type Bus = z.infer<typeof BusSchema>;
+export type Load = z.infer<typeof LoadSchema>;
+export type Branch = z.infer<typeof BranchSchema>;
+export type Generator = z.infer<typeof GeneratorSchema>;
+export type ParsedPowerSystemData = z.infer<typeof ParsedPowerSystemDataSchema>;
+export type SystemSummary = z.infer<typeof SystemSummarySchema>;
+export type LoadAnalysis = z.infer<typeof LoadAnalysisSchema>;
+export type TopologyAnalysis = z.infer<typeof TopologyAnalysisSchema>;
+export type SystemRecommendations = z.infer<typeof SystemRecommendationsSchema>;
+export type SystemIssues = z.infer<typeof SystemIssuesSchema>;
+export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
+export type ProcessingResult = z.infer<typeof ProcessingResultSchema>;

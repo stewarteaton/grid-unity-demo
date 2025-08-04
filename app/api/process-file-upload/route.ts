@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { z } from "zod";
 import {
   ParsedPowerSystemData,
   AnalysisResult,
+  ParsedPowerSystemDataSchema,
+  AnalysisResultSchema,
+  ProcessingResultSchema,
 } from "../../../types/power-system";
 
 // Initialize OpenAI client
@@ -57,13 +61,16 @@ function fallbackParseRaw(fileContent: string): ParsedPowerSystemData {
     }
   }
 
-  return {
+  const parsedData = {
     format: "PSS/E RAW",
     base_power,
     buses,
     loads,
     branches,
   };
+
+  // Validate with Zod schema
+  return ParsedPowerSystemDataSchema.parse(parsedData);
 }
 
 export async function POST(request: NextRequest) {
@@ -83,12 +90,16 @@ export async function POST(request: NextRequest) {
       console.log("No OpenAI API key set, using fallback parser");
       const parsedData = fallbackParseRaw(data);
       const analysis = await generateSystemAnalysis(parsedData);
-      return NextResponse.json({
+      const result = {
         success: true,
         parsedData,
         analysis,
         message: "File processed with fallback parser (no OpenAI key set)",
-      });
+      };
+
+      // Validate the complete result with Zod
+      const validatedResult = ProcessingResultSchema.parse(result);
+      return NextResponse.json(validatedResult);
     }
 
     // Parse the file content using OpenAI
@@ -106,9 +117,20 @@ export async function POST(request: NextRequest) {
       message: "File processed successfully using AI analysis",
     };
 
-    return NextResponse.json(result);
+    // Validate the complete result with Zod
+    const validatedResult = ProcessingResultSchema.parse(result);
+    return NextResponse.json(validatedResult);
   } catch (error) {
     console.error("Error processing grid data:", error);
+
+    // If it's a Zod validation error, provide more specific error message
+    if (error instanceof Error && error.message.includes("Zod")) {
+      return NextResponse.json(
+        { error: "Data validation failed", details: error.message },
+        { status: 422 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to process data" },
       { status: 500 }
@@ -148,7 +170,45 @@ Here is the file content:
 ${fileContent}
 """
 
-Return JSON with top-level keys: format, base_power, buses, loads, branches, generators.
+Return a JSON object with the following structure:
+{
+  "format": "string (e.g., 'PSS/E RAW', 'PSS/E DYR', 'CSV', 'JSON')",
+  "base_power": "number (base power in MVA, omit if not found)",
+  "buses": [
+    {
+      "id": "number",
+      "name": "string",
+      "voltage": "number",
+      "vm": "number",
+      "va": "number"
+    }
+  ],
+  "loads": [
+    {
+      "bus_id": "number",
+      "mw": "number",
+      "mvar": "number"
+    }
+  ],
+  "branches": [
+    {
+      "from": "number",
+      "to": "number",
+      "r": "number",
+      "x": "number"
+    }
+  ],
+  "generators": [
+    {
+      "id": "number",
+      "bus_id": "number",
+      "type": "string (optional)",
+      "base_mva": "number (optional)",
+      "inertia": "number (optional)"
+    }
+  ]
+}
+
 If a section is not present in the file, omit that key from the JSON response.
 Ensure all numeric values are properly parsed as numbers, not strings.
 `;
@@ -160,13 +220,14 @@ Ensure all numeric values are properly parsed as numbers, not strings.
         {
           role: "system",
           content:
-            "You are a power system expert. Always respond with valid JSON only, no additional text. Ensure all IDs are numbers.",
+            "You are a power system expert. Parse the file and return valid JSON with the exact structure specified. Ensure all IDs are numbers.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
+      response_format: { type: "json_object" },
       temperature: 0.1, // Low temperature for consistent parsing
       max_tokens: 4000,
     });
@@ -177,9 +238,9 @@ Ensure all numeric values are properly parsed as numbers, not strings.
       throw new Error("No response from OpenAI");
     }
 
-    // Remove markdown code block if present
-    const cleaned = responseText.replace(/^```json|^```|```$/gm, "").trim();
-    const parsedData: ParsedPowerSystemData = JSON.parse(cleaned);
+    // Parse the JSON response and validate with Zod
+    const rawData = JSON.parse(responseText);
+    const parsedData = ParsedPowerSystemDataSchema.parse(rawData);
     return parsedData;
   } catch (error) {
     console.error("Error parsing file with OpenAI:", error);
@@ -196,7 +257,7 @@ You are a power system analyst. Analyze the following power system data and prov
 System Data:
 ${JSON.stringify(parsedData, null, 2)}
 
-Please provide analysis in the following JSON structure:
+Return your analysis as a JSON object with this EXACT structure:
 
 {
   "summary": {
@@ -246,7 +307,11 @@ Please provide analysis in the following JSON structure:
   }
 }
 
-Return only the JSON, no additional text.
+IMPORTANT:
+- All numeric values must be numbers, not strings
+- All IDs must be numbers
+- Follow the exact structure above
+- Provide realistic analysis based on the power system data
 `;
 
   try {
@@ -256,13 +321,14 @@ Return only the JSON, no additional text.
         {
           role: "system",
           content:
-            "You are a power system analyst. Provide detailed analysis in the exact JSON structure specified. Return only JSON, no additional text.",
+            "You are a power system analyst. Provide detailed analysis in the exact JSON structure specified. Return only valid JSON.",
         },
         {
           role: "user",
           content: analysisPrompt,
         },
       ],
+      response_format: { type: "json_object" },
       temperature: 0.3,
       max_tokens: 2000,
     });
@@ -273,9 +339,9 @@ Return only the JSON, no additional text.
       throw new Error("No analysis response from OpenAI");
     }
 
-    // Remove markdown code block if present
-    const cleaned = responseText.replace(/^```json|^```|```$/gm, "").trim();
-    const analysis: AnalysisResult = JSON.parse(cleaned);
+    // Parse the JSON response and validate with Zod
+    const rawAnalysis = JSON.parse(responseText);
+    const analysis = AnalysisResultSchema.parse(rawAnalysis);
     return analysis;
   } catch (error) {
     console.error("Error generating analysis:", error);
@@ -285,7 +351,7 @@ Return only the JSON, no additional text.
     const totalLoadMVAR =
       parsedData.loads?.reduce((sum, load) => sum + load.mvar, 0) || 0;
 
-    return {
+    const fallbackAnalysis = {
       summary: {
         totalBuses: parsedData.buses?.length || 0,
         totalLoads: parsedData.loads?.length || 0,
@@ -335,5 +401,8 @@ Return only the JSON, no additional text.
             : undefined,
       },
     };
+
+    // Validate the fallback analysis with Zod
+    return AnalysisResultSchema.parse(fallbackAnalysis);
   }
 }
