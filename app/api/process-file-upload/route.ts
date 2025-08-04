@@ -57,8 +57,10 @@ async function processFile(
 
   // Use AI-based parser
   const parsedData = await parsePowerSystemFile(data, fileName);
+  console.log({ parsedData });
   const analysis = await generateSystemAnalysis(parsedData);
-
+  console.log({ analysis });
+  
   return {
     success: true,
     parsedData,

@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Types
+interface SchematicRequest {
+  image: string;
+  filename?: string;
+}
 
-export async function POST(request: NextRequest) {
-  try {
-    const { image, filename } = await request.json();
+interface SchematicResponse {
+  success: boolean;
+  data: any;
+  filename?: string;
+}
 
-    if (!image) {
-      return NextResponse.json({ error: "No image provided" }, { status: 400 });
-    }
+interface ErrorResponse {
+  error: string;
+}
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OpenAI API key not configured" },
-        { status: 500 }
-      );
-    }
-
-    const prompt = `Analyze this single-line diagram (SLD) image and extract the following information in JSON format:
+// Constants
+const ANALYSIS_PROMPT = `Analyze this single-line diagram (SLD) image and extract the following information in JSON format:
 
 1. **System Overview**:
    - Total number of buses
@@ -54,77 +52,127 @@ Please provide the response as a well-structured JSON object with clear sections
 
 Focus on electrical power system components and their relationships.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${image}`,
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 4000,
-      temperature: 0.1,
-    });
+// OpenAI configuration
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-    const content = response.choices[0]?.message?.content;
+// Validation functions
+function validateRequest(body: any): body is SchematicRequest {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    typeof body.image === "string" &&
+    body.image.length > 0
+  );
+}
 
-    if (!content) {
+function validateEnvironment(): boolean {
+  return !!process.env.OPENAI_API_KEY;
+}
+
+// JSON parsing utilities
+function extractJsonFromResponse(content: string): any {
+  try {
+    // Look for JSON in the response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+
+    // If no JSON found, create a structured response
+    return {
+      raw_response: content,
+      extracted_data: {
+        message: "Response received but no structured JSON found",
+        content: content,
+      },
+    };
+  } catch (parseError) {
+    // If JSON parsing fails, return the raw response
+    return {
+      raw_response: content,
+      parsing_error: "Failed to parse JSON from response",
+      content: content,
+    };
+  }
+}
+
+// OpenAI API call
+async function analyzeSchematic(image: string): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: ANALYSIS_PROMPT,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${image}`,
+            },
+          },
+        ],
+      },
+    ],
+    max_tokens: 4000,
+    temperature: 0.1,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("No response from OpenAI");
+  }
+
+  return content;
+}
+
+// Main handler
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<SchematicResponse | ErrorResponse>> {
+  try {
+    // Parse and validate request
+    const body = await request.json();
+
+    if (!validateRequest(body)) {
       return NextResponse.json(
-        { error: "No response from OpenAI" },
+        { error: "Invalid request: image is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate environment
+    if (!validateEnvironment()) {
+      return NextResponse.json(
+        { error: "OpenAI API key not configured" },
         { status: 500 }
       );
     }
 
-    // Try to extract JSON from the response
-    let jsonData;
-    try {
-      // Look for JSON in the response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonData = JSON.parse(jsonMatch[0]);
-      } else {
-        // If no JSON found, create a structured response
-        jsonData = {
-          raw_response: content,
-          extracted_data: {
-            message: "Response received but no structured JSON found",
-            content: content,
-          },
-        };
-      }
-    } catch (parseError) {
-      // If JSON parsing fails, return the raw response
-      jsonData = {
-        raw_response: content,
-        parsing_error: "Failed to parse JSON from response",
-        content: content,
-      };
-    }
+    // Analyze schematic
+    const analysisContent = await analyzeSchematic(body.image);
+    console.log({ analysisContent });
+    
+    // Parse response
+    const jsonData = extractJsonFromResponse(analysisContent);
+    console.log({ jsonData });
 
     return NextResponse.json({
       success: true,
       data: jsonData,
-      filename: filename,
+      filename: body.filename,
     });
   } catch (error) {
     console.error("Error processing schematic:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      },
-      { status: 500 }
-    );
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
