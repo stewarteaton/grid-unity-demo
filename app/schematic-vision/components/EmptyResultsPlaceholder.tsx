@@ -1,10 +1,10 @@
 import { EmptyResultsPlaceholder as SharedEmptyResultsPlaceholder } from "../../../components";
 
-export const EmptyResultsPlaceholder = () => {
+export function EmptyResultsPlaceholder() {
   return (
     <SharedEmptyResultsPlaceholder
       title="No Analysis Results"
-      description="Upload and process data to see AI-powered analysis results here"
+      description="Upload a single-line diagram image and click 'Analyze Schematic' to get started."
     />
   );
-};
+}

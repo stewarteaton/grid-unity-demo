@@ -6,18 +6,18 @@ interface ProcessButtonProps {
   onClick: () => void;
 }
 
-export const ProcessButton = ({
+export function ProcessButton({
   isProcessing,
   hasData,
   onClick,
-}: ProcessButtonProps) => {
+}: ProcessButtonProps) {
   return (
     <SharedProcessButton
       isProcessing={isProcessing}
       hasData={hasData}
       onClick={onClick}
-      processingText="Processing with AI..."
-      defaultText="Process Data with AI Analysis"
+      processingText="Analyzing..."
+      defaultText="Analyze Schematic"
     />
   );
-};
+}

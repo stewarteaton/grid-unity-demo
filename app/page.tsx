@@ -2,9 +2,12 @@
 import { useState } from "react";
 import ModelParser from "./model-parser/page";
 import GridTopologyExplorer from "./grid-topology/page";
+import SchematicVision from "./schematic-vision/page";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"topology" | "parser">("topology");
+  const [activeTab, setActiveTab] = useState<
+    "topology" | "parser" | "schematic"
+  >("topology");
 
   return (
     <div className="font-sans grid grid-rows-[10px_1fr_10px] items-center justify-items-center min-h-screen p-4 lg:p-2 pb-20">
@@ -34,7 +37,17 @@ export default function Home() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Model Parser
+              Model Parser (AI)
+            </button>
+            <button
+              onClick={() => setActiveTab("schematic")}
+              className={`px-4 py-2 font-medium ${
+                activeTab === "schematic"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Schematic Vision (AI)
             </button>
           </div>
 
@@ -42,6 +55,7 @@ export default function Home() {
           <div className="mt-2">
             {activeTab === "topology" && <GridTopologyExplorer />}
             {activeTab === "parser" && <ModelParser />}
+            {activeTab === "schematic" && <SchematicVision />}
           </div>
         </div>
       </main>
